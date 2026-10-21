@@ -178,12 +178,12 @@ The standalone LDSC analyses provided estimates of SNP-based heritability across
 
 Four epilepsy–brain-volume genetic correlations had unadjusted p-values below 0.05:
 
-- GTCSA–amygdala
-- JAE–caudate
-- JME–brainstem
-- JME–pallidum
+- GTCSA-amygdala
+- JAE-caudate
+- JME-brainstem
+- JME-pallidum
 
-None of the 49 epilepsy–brain-volume genetic correlations remained statistically significant following BH-FDR correction.
+None of the 49 epilepsy-brain-volume genetic correlations remained statistically significant following BH-FDR correction.
 
 Detailed estimates are provided in the accompanying data files and in Figure 3.1 and Appendix Tables A3-A4 of the thesis.
 
