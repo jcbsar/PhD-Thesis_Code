@@ -34,7 +34,7 @@ OUT = BASE / "results"
 # Seven epilepsy subtypes used in the genetic correlation analyses.
 EPI = {
     "CAE",
-    "GTCS",
+    "GTCSA",
     "JAE",
     "JME",
     "F-HS",
@@ -64,7 +64,7 @@ ORDER = [
     "PUT",
     "THA",
     "CAE",
-    "GTCS",
+    "GTCSA",
     "JAE",
     "JME",
     "F-HS",
@@ -78,7 +78,7 @@ LOG_NAMES = {
     "GGE": "GGE",
     "FE": "FE",
     "CAE": "CAE",
-    "GTCS": "GTCS",
+    "GTCSA": "GTCSA",
     "JAE": "JAE",
     "JME": "JME",
     "FE_HS": "F-HS",
@@ -399,7 +399,7 @@ def check_correlations(log_dir=None):
     ]
 
     expected_nominal = {
-        ("GTCS", "AMY"),
+        ("GTCSA", "AMY"),
         ("JAE", "CAU"),
         ("JME", "BRS"),
         ("JME", "PAL"),
