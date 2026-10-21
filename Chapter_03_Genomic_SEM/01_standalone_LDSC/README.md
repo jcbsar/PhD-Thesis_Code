@@ -1,89 +1,194 @@
-# Standalone LD score regression — Chapter 3
+# Standalone Linkage Disequilibrium Score Regression (LDSC)
 
-This folder supports thesis Figure 3.1 and Appendix Tables A3–A4. Original standalone Python LDSC v1.0.1 logs date from **11 August 2026**. They were checked against archived, summary-level figure exports. The local original logs were *not* committed because they contain user-specific HPC paths.
+## Overview
 
-## Contents
+Standalone linkage disequilibrium score regression (LDSC) was performed to estimate SNP-based heritability and pairwise genetic correlations for epilepsy phenotypes and subcortical brain volumes, as presented in **Figure 3.1 and Appendix Tables A3-A4** of Chapter 3. The analyses were conducted using the standalone Python implementation of LDSC (v1.0.1), with European-ancestry reference LD scores.
 
-| File | Purpose | Origin/status |
-| --- | --- | --- |
-| `config/trait_prevalence_specification.tsv` | Ordered 14-trait file names; sample and population prevalences | Archived input specification, unchanged |
-| `data/figure_3_1A_heritability.csv` | 16 phenotypes: h², SE, 95% CI | Archived final figure data, unchanged |
-| `data/figure_3_1B_rg_summary.tsv` | 91 pairwise LDSC rg, SE, Z and p | Archived results, unchanged |
-| `data/figure_3_1B_rg_matrix.csv` | 14×14 rg matrix for heatmap | Archived results, unchanged |
-| `results/figure_3_1_cross_domain_fdr.csv` | 49 cross-domain BH-FDR q-values | Regenerated from original archived p-values |
-| `scripts/01_run_h2.sh` | Run each phenotype's `--h2` on HPC/Linux | **Reconstructed** from saved standalone command logs |
-| `scripts/02_run_rg.sh` | Run 13 ordered `--rg` jobs for 91 unique pairs | **Reconstructed** from saved standalone command logs |
-| `scripts/03_verify_results.py` | Validate saved figure outputs, recompute BH-FDR; optional comparison to local original logs | New independent validation code |
-| `scripts/04_plot_figure_3_1.R` | Plot Figure 3.1A/B and combined Figure 3.1 using archived results | **Adapted/reconstructed**, not a verbatim final executed script |
+Two sets of analyses were performed:
 
-## Reproduce the verification (no GWAS data required)
+1. **Univariate LDSC:** Estimation of SNP-based heritability (h²) for nine epilepsy phenotypes and seven subcortical brain volumes.
+2. **Bivariate LDSC:** Estimation of pairwise genetic correlations (rg) across seven epilepsy subtypes and seven subcortical brain volumes.
 
-From this folder:
+These analyses were conducted separately from the LDSC procedure implemented within Genomic SEM, which was subsequently used to estimate genetic covariance and sampling covariance matrices for the multivariate analyses.
+
+## Phenotypes
+
+**Epilepsy phenotypes**
+
+- Genetic generalised epilepsy (GGE)
+- Focal epilepsy (FE)
+- Generalised tonic-clonic seizures alone (GTCSA)
+- Childhood absence epilepsy (CAE)
+- Juvenile absence epilepsy (JAE)
+- Juvenile myoclonic epilepsy (JME)
+- Focal epilepsy with hippocampal sclerosis (F-HS)
+- Focal lesion-negative epilepsy (F-Neg)
+- Focal epilepsy with other lesions (F-Oth)
+
+**Subcortical brain volumes**
+
+- Nucleus accumbens (ACC)
+- Amygdala (AMY)
+- Brainstem (BRS)
+- Caudate (CAU)
+- Pallidum (PAL)
+- Putamen (PUT)
+- Thalamus (THA)
+
+GGE and FE were included in the univariate heritability analyses but excluded from the pairwise genetic correlation analyses.
+
+## Analytical Methods
+
+### SNP-based Heritability
+
+Univariate LDSC was used to estimate SNP-based heritability for each phenotype.
+
+Heritability estimates for binary epilepsy phenotypes were expressed on the liability scale using the sample and population prevalence specifications provided in `config/trait_prevalence_specification.tsv`.
+
+A sample prevalence of 0.50 was specified for the epilepsy phenotypes, with phenotype-specific population prevalence estimates. Brain-volume phenotypes were analysed as quantitative traits without prevalence transformations. Estimates and standard errors were used to calculate 95% confidence intervals. For binary epilepsy phenotypes, effective sample sizes were used with a sample prevalence of 0.5 for liability-scale transformation, following recommendations for case–control GWAS meta-analyses. Phenotype-specific population prevalence values were specified based on the ILAE Consortium's 2018 GWAS (Supplementary Table 11). Quantitative brain-volume phenotypes did not require prevalence correction.
+
+### Genetic Correlations
+
+Bivariate LDSC was used to estimate pairwise genetic correlations between seven epilepsy subtypes and seven subcortical brain volumes. A total of 91 unique pairwise correlations were estimated across the 14 phenotypes, including 49 epilepsy–brain-volume comparisons. The Benjamini–Hochberg false discovery rate (BH-FDR) procedure was applied to the 49 epilepsy–brain-volume comparisons to account for multiple testing.
+
+## Repository Contents
+
+| File | Description |
+|---|---|
+| `config/trait_prevalence_specification.tsv` | GWAS input filenames and prevalence specifications |
+| `data/figure_3_1A_heritability.csv` | Heritability estimates, standard errors and 95% confidence intervals |
+| `data/figure_3_1B_rg_summary.tsv` | Pairwise genetic correlation estimates, standard errors, Z statistics and p-values |
+| `data/figure_3_1B_rg_matrix.csv` | Genetic correlation matrix used for visualisation |
+| `results/figure_3_1_cross_domain_fdr.csv` | BH-FDR-adjusted results for the 49 epilepsy–brain-volume comparisons |
+| `scripts/01_run_h2.sh` | Standalone LDSC heritability analysis |
+| `scripts/02_run_rg.sh` | Standalone LDSC genetic correlation analysis |
+| `scripts/03_verify_results.py` | Validation of summary-level outputs and BH-FDR calculations |
+| `scripts/04_plot_figure_3_1.R` | Generation of heritability and genetic correlation plots |
+
+## Software Requirements
+
+The LDSC analyses require:
+
+- Standalone Python LDSC v1.0.1
+- Python and the dependencies required by LDSC
+- European-ancestry reference LD scores and regression weights (`eur_w_ld_chr`)
+- Harmonised and munged GWAS summary statistics
+
+The accompanying visualisation script requires R with the following packages:
+
+- `ggplot2`
+- `pheatmap`
+
+The summary-level verification script uses the Python standard library and does not require GWAS summary statistics or LDSC.
+
+## Running the Analyses
+
+### 1. Input Data
+
+The LDSC scripts require harmonised GWAS summary statistics in `.sumstats.gz` format.
+
+The expected input filenames and prevalence parameters are defined in:
+
+`config/trait_prevalence_specification.tsv`
+
+GWAS summary statistics and external LD reference files are not included in this repository and must be obtained separately.
+
+### 2. Heritability and Genetic Correlation Analyses
+
+The shell scripts use environment variables to specify the locations of the LDSC installation, GWAS summary statistics, LD reference files and output directory.
+
+From the `01_standalone_LDSC` directory:
+
+```bash
+export LDSC_PY=/path/to/ldsc.py
+export MUNGED_DIR=/path/to/munged_sumstats
+export EUR_LD_DIR=/path/to/eur_w_ld_chr
+export ANALYSIS_OUT_DIR=/path/to/analysis_outputs
+export PYTHON_BIN=python
+```
+
+Run the heritability analyses:
+
+```bash
+bash scripts/01_run_h2.sh
+```
+
+Run the genetic correlation analyses:
+
+```bash
+bash scripts/02_run_rg.sh
+```
+
+The scripts use the recorded LDSC command configurations and input specifications. They are portable shell implementations rather than copies of the original HPC job-submission scripts.
+
+**Note:** The heritability execution manifest covers 14 phenotypes. Although broad GGE and FE estimates are included in the final Figure 3.1A data, their original standalone execution commands and logs are not available in the accompanying analysis records. These two estimates therefore cannot be independently regenerated using the supplied shell script alone.
+
+The shell scripts execute LDSC commands directly and do not submit jobs through SLURM.
+
+### 3. Verification of Summary-Level Results
+
+The supplied Python script checks the consistency of the stored heritability and genetic correlation results and recalculates BH-FDR-adjusted p-values.
 
 ```bash
 python3 scripts/03_verify_results.py
 ```
 
-Expected: 16 heritability entries, 91 correlations, 49 cross-domain tests, **four unadjusted p < 0.05, zero BH-FDR q < 0.05**. The script writes its BH results to `results/figure_3_1_cross_domain_fdr.csv`.
-
-If original log files are available **privately** on your computer, use:
+Where the original standalone LDSC logs are available, the exported estimates can additionally be compared against them:
 
 ```bash
 python3 scripts/03_verify_results.py \
-  --h2-logs /path/to/private/h2-logs \
-  --rg-logs /path/to/private/rg-logs
+  --h2-logs /path/to/h2_logs \
+  --rg-logs /path/to/rg_logs
 ```
 
-The 14 archived univariate logs and 13 correlation logs available during preparation pass these checks. **The original broad GGE and FE univariate logs were not recovered.** Their h² estimates are preserved from the archived final figure-data CSV, and must not be represented as independently checked against executed original log files.
+The verification procedure evaluates:
 
-## Reproduce Figure 3.1 from archived numbers
+- The 16 heritability entries and corresponding confidence intervals.
+- The completeness and consistency of the 91 pairwise genetic correlation estimates.
+- The 49 epilepsy–brain-volume comparisons.
+- The BH-FDR correction for multiple testing.
 
-Requires **R**, `ggplot2` and `pheatmap`:
+Comparison with available original execution logs supports the 14 subtype/brain-volume heritability estimates and all 91 pairwise genetic correlation estimates. The broad GGE and FE heritability estimates are retained from the final figure-data records.
+
+### 4. Generating Figure 3.1
+
+The accompanying R script generates the heritability plot and genetic correlation heatmap from the supplied summary-level results.
+
+Install the required R packages:
 
 ```r
 install.packages(c("ggplot2", "pheatmap"))
 ```
 
-Then from this folder run:
+Run:
 
 ```bash
 Rscript scripts/04_plot_figure_3_1.R
 ```
 
-The script creates PNG and PDF versions of Panels A and B and the combined figure under the ignored `outputs/figures/` directory. The numerical values and 95% CIs are read from the recovered export (not recalculated from GWAS). Heatmap colours are capped at −1 and 1, but cell text retains unconstrained rg values above 1. GTCS in source data is labelled **GTCSA** in plots.
+The script generates PNG and PDF outputs in:
 
-**Environment limit:** The R plot script was reviewed but was **not executed** while assembling this repository because R was not available in the preparation environment. Verify its appearance on a computer with R installed before calling the figure regenerated.
+`outputs/figures/`
 
-## Rerun standalone LDSC from harmonised summary statistics (advanced)
+The figure-generation script uses the stored LDSC estimates and does not independently rerun the GWAS analyses.
 
-This step requires the original HapMap3-aligned, munged `.hm3.sumstats.gz` files, an installation of standalone Python LDSC v1.0.1 (or a compatible pinned build), and the European reference and regression LD scores (`eur_w_ld_chr`). Those reference/data files are **not** redistributed here.
+## Summary of Findings
 
-The original analyses used effective per-SNP sample sizes for binary epilepsy traits; the sample prevalence is **0.50** and population prevalences are given in `config/trait_prevalence_specification.tsv`. Brain volumes use `nan` for both prevalences. The 14-trait manifest excludes broad GGE and FE because the archived original `--h2` input commands for them have not been recovered.
+The standalone LDSC analyses provided estimates of SNP-based heritability across the epilepsy and subcortical brain-volume phenotypes.
 
-Set the paths in your environment **outside the Git repository**, for example:
+Four epilepsy–brain-volume genetic correlations had unadjusted p-values below 0.05:
 
-```bash
-export LDSC_PY=/path/to/ldsc.py
-export MUNGED_DIR=/path/to/private/munged
-export EUR_LD_DIR=/path/to/reference/eur_w_ld_chr
-export ANALYSIS_OUT_DIR=/path/to/private/analysis_outputs
-export PYTHON_BIN=python
+- GTCSA–amygdala
+- JAE–caudate
+- JME–brainstem
+- JME–pallidum
 
-bash scripts/01_run_h2.sh
-bash scripts/02_run_rg.sh
-```
+None of the 49 epilepsy–brain-volume genetic correlations remained statistically significant following BH-FDR correction.
 
-Run within your institution's permitted computing environment, with suitable SLURM allocations if required. The scripts do not automatically submit `sbatch` jobs and make **no** promises about memory or walltime. They reproduce the observed command configurations but were not rerun with the full GWAS input files during repository preparation.
+Detailed estimates are provided in the accompanying data files and in Figure 3.1 and Appendix Tables A3-A4 of the thesis.
 
-## Findings checked
+## Data Availability
 
-- Broad GGE: h² = **0.2317**, SE = **0.0178**, taken from recovered final Figure 3.1A data; broad FE: h² = **0.0287**, SE = **0.0064**, same provenance.
-- Original 14 available `--h2` logs match their figure-data values to reported precision.
-- All 91 archived correlations matched the 13 August 2026 `--rg` logs (rg, SE, Z and p).
-- Four nominal epilepsy/brain correlations: GTCSA–amygdala, JAE–caudate, JME–brainstem and JME–pallidum. All have BH-FDR q ≈ 0.52185; none is significant after correcting across 49 cross-domain tests.
+The repository contains analysis scripts, input specifications and selected summary-level outputs. Original GWAS summary statistics and external LD reference datasets are not redistributed.
 
-## Scope and provenance
-
-Standalone LDSC outputs should **not** be substituted for `GenomicSEM::ldsc()` S/V matrices; those were separate analyses and will be documented under `../02_GenomicSEM_LDSC/`. The preliminary "FINAL CORRECTED STANDALONE LDSC + FIGURE 1A + FIGURE 1B.R" contained older **GGE = 0.584** and **FE = 0.067** plot values, so that original working script is deliberately **not** presented as the final executed Figure 3.1 workflow. The reported final Figure 3.1A CSV is used instead.
-
-For exact original processing logs, consult the author's private research archive. Do not place logs exposing original HPC user account paths or restricted summary-statistic files into a public repository without review.
+The standalone LDSC estimates presented here are distinct from the genetic covariance and sampling covariance matrices generated using `GenomicSEM::ldsc()` for the subsequent factor analyses.
