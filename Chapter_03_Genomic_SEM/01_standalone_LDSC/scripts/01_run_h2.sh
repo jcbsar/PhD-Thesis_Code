@@ -38,9 +38,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 mkdir -p "$ANALYSIS_OUT_DIR/h2"
 
-# Estimate heritability for nine epilepsy phenotypes and
-# seven subcortical brain-volume phenotypes.
-#
+# Estimate SNP-based heritability for nine epilepsy phenotypes
+# (including broad GGE and FE) and seven subcortical brain volumes.
+# Liability-scale prevalence parameters are specified for binary traits.
 
 while IFS=$'\t' read -r trait filename sample_prev population_prev; do
 
