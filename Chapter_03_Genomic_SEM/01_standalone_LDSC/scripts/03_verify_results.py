@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Validate archived numerical Figure 3.1 inputs without rerunning LDSC.
+"""Validate the standalone LDSC results reported in Figure 3.1.
 
-Uses only Python's standard library. Optionally checks against original LDSC
-logs held outside the public repository. Generates a derived BH-FDR table.
+Checks SNP-based heritability, genetic correlations, confidence intervals,
+and BH-FDR-adjusted p-values using summary-level results.
+
+Optionally compares estimates against the original LDSC execution logs.
+Uses only Python's standard library and does not rerun LDSC.
 """
 from __future__ import annotations
 import argparse
