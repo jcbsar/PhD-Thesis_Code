@@ -38,11 +38,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 mkdir -p "$ANALYSIS_OUT_DIR/h2"
 
-# Estimate heritability for seven epilepsy subtypes and seven
-# subcortical brain-volume phenotypes.
+# Estimate heritability for nine epilepsy phenotypes and
+# seven subcortical brain-volume phenotypes.
 #
-# Broad GGE and FE are included in Figure 3.1A but are not
-# represented in this execution manifest.
 
 while IFS=$'\t' read -r trait filename sample_prev population_prev; do
 
