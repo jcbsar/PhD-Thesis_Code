@@ -1,0 +1,26 @@
+# Analysis inputs and machine-private content
+*.sumstats
+*.sumstats.gz
+*.hm3.sumstats.gz
+*.rds
+*.RData
+*.Rhistory
+*.Rproj.user/
+*.log
+*.runlog
+*.out
+*.err
+*.partial
+*.tmp
+# Large data and generated graphics
+outputs/
+local/
+private/
+raw_data/
+ref_data/
+# Platform/editor/compiled state
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.vscode/
