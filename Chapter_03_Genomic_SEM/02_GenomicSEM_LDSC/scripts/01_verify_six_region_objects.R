@@ -45,27 +45,64 @@ read_ldsc <- function(path) {
 
 # GenomicSEM's V and N index the lower triangle of S, including the diagonal,
 # using R column-major order. Translate the retained ordering into the source.
+
+# Map retained covariance elements to their original LDSC positions.
 vech_index <- function(all_traits, retained_traits) {
+
   n <- length(all_traits)
   k <- length(retained_traits)
-  source_pairs <- which(lower.tri(matrix(FALSE, n, n), diag = TRUE),
-                        arr.ind = TRUE)
-  retained_pairs <- which(lower.tri(matrix(FALSE, k, k), diag = TRUE),
-                          arr.ind = TRUE)
-  source_row <- match(retained_traits[retained_pairs[, 1]], all_traits)
-  source_col <- match(retained_traits[retained_pairs[, 2]], all_traits)
+
+  source_pairs <- which(
+    lower.tri(matrix(FALSE, n, n), diag = TRUE),
+    arr.ind = TRUE
+  )
+
+  retained_pairs <- which(
+    lower.tri(matrix(FALSE, k, k), diag = TRUE),
+    arr.ind = TRUE
+  )
+
+  source_row <- match(
+    retained_traits[retained_pairs[, 1]],
+    all_traits
+  )
+
+  source_col <- match(
+    retained_traits[retained_pairs[, 2]],
+    all_traits
+  )
+
   if (anyNA(source_row) || anyNA(source_col)) {
-    stop("At least one retained phenotype is missing from the source LDSC object")
+    stop(
+      "At least one retained phenotype is missing from ",
+      "the source LDSC object"
+    )
   }
-  source_keys <- paste(source_pairs[, 1], source_pairs[, 2], sep = ":")
-  lookup <- paste(pmax(source_row, source_col),
-                  pmin(source_row, source_col), sep = ":")
+
+  source_keys <- paste(
+    source_pairs[, 1],
+    source_pairs[, 2],
+    sep = ":"
+  )
+
+  lookup <- paste(
+    pmax(source_row, source_col),
+    pmin(source_row, source_col),
+    sep = ":"
+  )
+
   idx <- match(lookup, source_keys)
-  if (anyNA(idx) || length(idx) != k <- as.integer(n * (n + 1L) / 2L) {
-    stop("Could not map all retained covariance-element indices")
+
+  if (anyNA(idx) ||
+      length(idx) != k * (k + 1L) / 2L) {
+    stop(
+      "Could not map all retained covariance-element indices"
+    )
   }
+
   idx
 }
+
 
 compare_pair <- function(group, full_path, retained_path, expected_phenotypes) {
   full <- read_ldsc(full_path)
