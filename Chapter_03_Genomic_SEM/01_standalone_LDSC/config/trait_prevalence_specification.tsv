@@ -1,4 +1,7 @@
 Trait	Filename	SamplePrev	PopulationPrev
+
+GGE	GGE_cau.hm3.sumstats.gz	0.50	0.002
+FE	focal_cau.hm3.sumstats.gz	0.50	0.003
 CAE	CAE_cau.hm3.sumstats.gz	0.50	0.00035
 GTCSA	GTCS_cau.hm3.sumstats.gz	0.50	0.00020
 JAE	JAE_cau.hm3.sumstats.gz	0.50	0.00015
