@@ -1,32 +1,38 @@
-# 02 — Multivariable LDSC for Genomic SEM
+# 02 - Multivariable LDSC for Genomic SEM
 
 ## Purpose
 
-This directory documents the multivariable linkage disequilibrium score regression (LDSC) covariance inputs used for the Chapter 3 Genomic SEM factor models. It is distinct from `01_standalone_LDSC`, which documents the individual heritability estimates, pairwise genetic correlations and Figure 3.1.
+This directory documents the multivariable linkage disequilibrium score regression (LDSC) covariance inputs used for the Genomic Structural Equation Modelling (Genomic SEM) analyses in Chapter 3. It is distinct from `01_standalone_LDSC`, which documents the individual SNP-based heritability estimates, pairwise genetic correlations and Figure 3.1.
 
-Multivariable `GenomicSEM::ldsc()` provides the genetic covariance matrix (`S`), the sampling covariance matrix of its unique elements (`V`), and associated intercept and sample-size information (`I`, `N`, `m`). These quantities are inputs to the exploratory and confirmatory factor analyses and subsequent multivariate GWAS.
+Multivariable LDSC was performed using `GenomicSEM::ldsc()` to estimate the genetic covariance matrix (`S`), the sampling covariance matrix of its unique elements (`V`), and associated intercept and sample-size information (`I`, `N`, `m`). These outputs provide the covariance structure for subsequent exploratory factor analysis (EFA), confirmatory factor analysis (CFA) and multivariate GWAS.
 
 ## Phenotype sets and archived inputs
 
-Initial July 2026 LDSC analyses included seven subcortical brain-volume phenotypes: accumbens, amygdala, brainstem, caudate, pallidum, putamen and thalamus. The retained models used the six regions other than brainstem.
+The initial LDSC analyses included seven subcortical brain-volume phenotypes: accumbens, amygdala, brainstem, caudate, pallidum, putamen and thalamus. Following model development, brainstem was excluded from the retained GGE and FE models, leaving six brain-volume phenotypes.
 
-| Group | Original LDSC input object | Original dimensions (`S`; `V`) | Retained model input | Retained dimensions (`S`; `V`) |
-| --- | --- | --- | --- | --- |
-| GGE: CAE, GTCS, JAE, JME | `GGE_ldsc_July2026.rds` | 11 × 11; 66 × 66 | `ldsc_GGE_brain_6region.rds` | 10 × 10; 55 × 55 |
+| Group | Original LDSC object | Original dimensions (`S`; `V`) | Retained model input | Retained dimensions (`S`; `V`) |
+|---|---|---|---|---|
+| GGE: CAE, GTCSA, JAE, JME | `GGE_ldsc_July2026.rds` | 11 × 11; 66 × 66 | `ldsc_GGE_brain_6region.rds` | 10 × 10; 55 × 55 |
 | FE: F_HS, F_Neg, F_Oth | `FE_subtypes_brain_ldsc_July2026.rds` | 10 × 10; 55 × 55 | `ldsc_FE_brain_6region.rds` | 9 × 9; 45 × 45 |
 
-Here, `GTCS` is the computational phenotype label for GTCSA in the thesis. The computational labels `F_HS`, `F_Neg` and `F_Oth` correspond to F-HS, F-Neg and F-Oth in the thesis. Phenotype names are retained as stored in the original objects to preserve matrix indexing and model syntax.
+`GTCS` is the computational label corresponding to GTCSA in the thesis. Similarly, `F_HS`, `F_Neg` and `F_Oth` correspond to F-HS, F-Neg and F-Oth. The original computational names are preserved to maintain consistency with the archived covariance matrices and model syntax.
 
-The retained six-region objects have been checked against their July source objects: the corresponding numerical entries in `S`, `I`, `V` and `N` agree exactly after retaining the appropriate phenotypes and matching lower-triangular covariance-element indices. The retained GGE covariance object was also used to reproduce the standardized CFA estimates in Appendix Table A9; the FE object reproduced the CFA estimates in Appendix Table A15 to the reported precision. These CFA results are addressed separately in `03_EFA_CFA`.
+Numerical comparisons confirmed that the retained six-region objects match the corresponding elements of the July LDSC objects for `S`, `V`, `I` and `N`, after accounting for phenotype order and the lower-triangular indexing of covariance elements.
+
+The retained GGE and FE objects were subsequently used to reproduce the standardised CFA parameter estimates reported in Appendix Tables A9 and A15, respectively, to the reported precision. The CFA specifications and results are addressed separately in `03_EFA_CFA`.
 
 ## LDSC inputs and parameters
 
-The original July R scripts use European LD scores and regression weights from `eur_w_ld_chr/`. GWAS summary statistics were harmonised using `GenomicSEM::munge()`, aligned to a HapMap3 reference SNP list and filtered at MAF ≥ 0.01. SNP-specific sample sizes from the source summary statistics were retained where present. A sample case fraction of 0.50 was specified for epilepsy phenotypes, reflecting the effective-sample-size convention; prevalence arguments were set to `NA` for continuous brain-volume phenotypes.
+The original analyses were performed using European LD scores and regression weights from `eur_w_ld_chr/`.
 
-The July scripts specified the following population prevalences:
+GWAS summary statistics were harmonised using `GenomicSEM::munge()` with the HapMap3 reference SNP list and a minor allele frequency threshold of MAF ≥ 0.01. SNP-specific sample sizes were retained from the source GWAS summary statistics.
 
-| Epilepsy trait | July LDSC population prevalence |
-| --- | ---: |
+For the epilepsy phenotypes, a sample case fraction of 0.50 was specified, reflecting the effective-sample-size convention used in the source GWAS. Population prevalences were specified for liability-scale transformation. Both sample and population prevalence parameters were set to `NA` for continuous brain-volume phenotypes.
+
+### Population prevalences used in the July LDSC analyses
+
+| Epilepsy phenotype | Population prevalence |
+|---|---:|
 | CAE | 0.00015 |
 | GTCS (GTCSA) | 0.00020 |
 | JAE | 0.00015 |
@@ -35,30 +41,64 @@ The July scripts specified the following population prevalences:
 | F_Neg | 0.00090 |
 | F_Oth | 0.00135 |
 
-The original munging log records that an INFO filter could not be applied to input files lacking an INFO field; the requested MAF threshold and reference-allele checks are documented in that log. Source GWAS files and reference LD files are not bundled in this directory.
+An archived munging log, `GGE_subtypes_brainvolumes_July2026_munge.log`, records execution on 12 August 2026. The log documents SNP retention following harmonisation and notes that INFO filtering could not be applied to source files without an INFO field. Reference-allele matching and MAF filtering were performed as recorded in the log.
 
-## July and corrected August covariance versions
+Original GWAS summary statistics and LD reference files are not distributed in this repository.
 
-The corrected August LDSC analyses used **CAE = 0.00035** and **JME = 0.00015**, rather than the July settings shown above. The August GGE covariance estimates are not interchangeable with the July-derived covariance object used to reproduce the retained GGE CFA in Appendix Table A9. The August-corrected objects are separate analytical versions; replacing the retained model's input would constitute a new sensitivity or reanalysis and would require checking the downstream estimates and model fit.
+## July and corrected August LDSC versions
 
-The purpose of the scripts here is to verify the provenance of the **reported** models, not to imply that the corrected August specification was used to generate them. Both versions should be retained in archived research storage with their original filenames and execution logs.
+Subsequent corrected August LDSC analyses used updated population prevalence specifications for two GGE subtypes:
 
-## Reproducibility check
+| Phenotype | July specification | Corrected August specification |
+|---|---:|---:|
+| CAE | 0.00015 | 0.00035 |
+| JME | 0.00035 | 0.00015 |
 
-The script `scripts/01_verify_six_region_objects.R` checks the full July GGE and FE LDSC objects against the retained six-region inputs. It tests all entries of `S`, `I`, `V` and `N` after matching phenotype names and the ordering of the lower-triangular covariance elements in `V` and `N`.
+The corrected August LDSC analyses produced different covariance estimates for affected GGE phenotypes.
 
-From the repository root, with R installed:
+The retained GGE CFA estimates reported in Appendix Table A9 were reproduced using `ldsc_GGE_brain_6region.rds`, which matches the July-derived covariance estimates rather than the corrected August object.
+
+The corrected August covariance matrices are therefore treated as a distinct analytical version and are not substituted retrospectively into the retained models. Evaluating the consequences of the updated prevalence specification for factor-model parameters or multivariate GWAS results would require separate downstream analyses.
+
+Both LDSC versions should be preserved in research archives with their original filenames and associated execution records.
+
+## Reproducibility and verification
+
+The script `scripts/01_verify_six_region_objects.R` compares the original July LDSC covariance objects with the six-region objects retained for modelling.
+
+It verifies numerical agreement for:
+
+- The genetic covariance matrix (`S`).
+- The LDSC intercept matrix (`I`).
+- The sampling covariance matrix (`V`).
+- The sample-size matrix (`N`).
+
+For `V` and `N`, the comparison accounts for the ordering of unique covariance elements in the lower triangle of `S`.
+
+### Running the verification script
+
+The script requires R and access to the four archived `.rds` files.
+
+Run it from the repository root using the following positional arguments, in the order shown:
 
 ```bash
-Rscript Chapter_03_Genomic_SEM/02_GenomicSEM_LDSC/scripts/01_verify_six_region_objects.R \
-  "/path/to/GGE_ldsc_July2026.rds" \
-  "/path/to/ldsc_GGE_brain_6region.rds" \
-  "/path/to/FE_subtypes_brain_ldsc_July2026.rds" \
-  "/path/to/ldsc_FE_brain_6region.rds"
+Rscript Chapter_03_Genomic_SEM/02_GenomicSEM_LDSC/scripts/01_verify_six_region_objects.R "/path/to/GGE_ldsc_July2026.rds" "/path/to/ldsc_GGE_brain_6region.rds" "/path/to/FE_subtypes_brain_ldsc_July2026.rds" "/path/to/ldsc_FE_brain_6region.rds"
 ```
 
-The script uses **base R only** and writes a verification table to `outputs/six_region_object_verification.csv` within this directory. It does **not** rerun LDSC, perform matrix smoothing, overwrite the saved `.rds` files or fit CFA models. Numerical agreement documents consistency between archived objects; it does not independently establish every upstream GWAS processing step.
+Replace the example paths with the locations of the archived files. The command can also be run from a Windows terminal with Rscript available.
+
+The script uses base R and writes its verification report to:
+
+`outputs/six_region_object_verification.csv`
+
+The verification script does not rerun LDSC, perform matrix smoothing, modify the original `.rds` files or fit CFA models.
+
+Agreement between archived covariance objects establishes consistency of the retained modelling inputs with their identified source objects. It does not independently verify all upstream GWAS processing or alternative LDSC specifications.
 
 ## Archived-data handling
 
-Keep the original `.rds` files, harmonised GWAS statistics, LD reference files and execution logs in appropriately controlled research storage. Do not commit restricted summary statistics or large intermediate data to the public repository. The scripts can be run by providing paths to the archived files. Generated verification outputs are derived reports and need not be committed.
+Original covariance objects, harmonised GWAS summary statistics, LD reference files and execution logs should remain in appropriately controlled research storage.
+
+Large intermediate files and restricted GWAS data are not included in this repository. The verification script accepts local paths to these archived inputs.
+
+Generated verification reports can be retained locally and do not need to be committed to the repository.
