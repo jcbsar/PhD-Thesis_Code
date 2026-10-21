@@ -31,10 +31,11 @@ read_ldsc <- function(path) {
       !identical(dim(obj$I), c(n, n))) {
     stop("S and I dimensions must be square and consistent: ", path)
   }
-  k <- n * (n + 1L) / 2L
-  if (!identical(dim(obj$V), c(k, k)) || length(obj$N) != k) {
-    stop("V/N lengths do not match lower triangle of S: ", path)
-  }
+k <- as.integer(n * (n + 1L) / 2L)
+
+if (!all(dim(obj$V) == c(k, k)) || length(obj$N) != k) {
+  stop("V/N lengths do not match lower triangle of S: ", path)
+}
   for (field in needed) {
     if (!is.numeric(obj[[field]]) || any(!is.finite(obj[[field]]))) {
       stop("Non-numeric or non-finite ", field, " in: ", path)
