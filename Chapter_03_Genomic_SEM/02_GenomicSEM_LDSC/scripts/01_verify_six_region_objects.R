@@ -61,7 +61,7 @@ vech_index <- function(all_traits, retained_traits) {
   lookup <- paste(pmax(source_row, source_col),
                   pmin(source_row, source_col), sep = ":")
   idx <- match(lookup, source_keys)
-  if (anyNA(idx) || length(idx) != k * (k + 1L) / 2L) {
+  if (anyNA(idx) || length(idx) != k <- as.integer(n * (n + 1L) / 2L) {
     stop("Could not map all retained covariance-element indices")
   }
   idx
