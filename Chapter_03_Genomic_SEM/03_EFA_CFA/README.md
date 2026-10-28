@@ -32,20 +32,22 @@ The retained GGE specification comprised two correlated latent factors:
 - **GGE factor:** CAE, GTCSA, JAE and JME.
 - **Brain-volume factor:** Accumbens, amygdala, caudate, pallidum, putamen and thalamus.
 
-The residual variance of CAE was constrained to zero to address a boundary estimate. The retained model produced the following fit statistics:
+The residual variance of CAE was constrained to zero to address a boundary estimate. The retained model, evaluated using the corrected LDSC population-prevalence specification, produced the following fit statistics:
 
 | Statistic | Estimate |
-|---|---:|
-| χ² | 82.54 |
+|---|---|
+| χ² | 82.47 |
 | Degrees of freedom | 35 |
 | CFI | 0.916 |
 | SRMR | 0.075 |
-| AIC | 122.54 |
-| Latent-factor correlation | −0.166 |
+| AIC | 122.47 |
+| Latent-factor correlation | Approximately −0.17 |
 
 Both CFI and SRMR met the prespecified fit criteria.
 
-The retained GGE CFA model was reproduced using `ldsc_GGE_brain_6region.rds`. Its standardised factor loadings, standard errors and latent-factor correlation agreed with Appendix Table A9 to the reported precision.
+The corrected GGE CFA was verified against the prevalence-corrected August LDSC covariance object, reproducing the fit statistics reported in Appendix Table A8. Standardised factor loadings and their standard errors agreed with Appendix Table A9 to the reported precision.
+
+An earlier reproduction using the original July six-region LDSC object produced χ² = 82.54 and AIC = 122.54. Those values reflect the earlier covariance specification and should not be substituted for the corrected results reported above.
 
 ### Retained FE model
 
@@ -57,7 +59,7 @@ The retained FE specification comprised two correlated latent factors:
 The retained model produced the following fit statistics:
 
 | Statistic | Estimate |
-|---|---:|
+|---|---|
 | χ² | 70.30 |
 | Degrees of freedom | 26 |
 | CFI | 0.863 |
@@ -81,15 +83,32 @@ The full model comparisons and sensitivity findings are reported in the Chapter 
 
 ## Reproducibility and archived inputs
 
-The retained CFA models were reproduced using the archived six-region LDSC objects:
+The covariance objects used during model development include both original and subsequently corrected LDSC specifications. These must be distinguished when reproducing the reported analyses.
+
+**Original July covariance objects:**
 
 - `ldsc_GGE_brain_6region.rds`
 - `ldsc_FE_brain_6region.rds`
 
-These objects correspond to the July-derived LDSC covariance specifications verified in `02_GenomicSEM_LDSC`. The corrected August LDSC prevalence specification is documented separately and should not be substituted into these analyses without reevaluating the downstream model estimates.
+The original GGE object reflects the earlier population-prevalence specification in which CAE and JME prevalences were interchanged. It reproduces the earlier GGE CFA fit statistics but is not the corrected reference for the final GGE model.
+
+**Corrected GGE LDSC specification:**
+
+The corrected population prevalences were:
+
+- CAE: 0.00035
+- GTCSA: 0.00020
+- JAE: 0.00015
+- JME: 0.00015
+
+The August corrected LDSC output was archived as `GGE_ldsc_July2026.rds`, despite the filename referring to July. Its provenance was established by verifying the underlying script, covariance estimates and reproduced CFA results rather than relying on the filename alone.
+
+This corrected object reproduced the final GGE CFA fit statistics reported in Appendix Table A8. It should be distinguished from the separate corrected LDSC object subsequently prepared for the multivariate GWAS.
 
 The original model-development scripts include `GGE_modelling_July2026.R` and `FE_modelling_July2026.R`. These contain exploratory specifications, including models that were not retained.
 
-Reproducible scripts for the retained models and the additional sensitivity analyses will be included in this directory following verification against the reported thesis results.
+The initial standalone retained GGE CFA reproduction was conducted using the original July covariance specification. The GitHub reproduction script must therefore be checked and updated to use the corrected LDSC inputs before it can be treated as reproducing the final GGE CFA results.
+
+Additional reproducibility scripts for the retained models and sensitivity analyses should be included following verification against the reported thesis results.
 
 Original covariance objects and large intermediate data files are retained in research archives rather than distributed in this repository.
