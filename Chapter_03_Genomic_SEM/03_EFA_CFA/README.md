@@ -67,7 +67,7 @@ The retained model produced the following fit statistics:
 
 The FE model met the SRMR criterion but not the prespecified CFI threshold, indicating mixed evidence of model fit.
 
-The retained FE CFA model was reproduced using `ldsc_FE_brain_6region.rds`. Its standardised factor loadings and latent-factor correlation agreed with Appendix Table A15 to the reported precision.
+The retained FE CFA model was reproduced using the archived LDSC covariance object (`FE_subtypes_brain_ldsc_July2026.rds`). The resulting model-fit statistics, standardised factor loadings, standard errors and latent-factor correlation agreed with Appendix Tables A14 and A15.
 
 ## Sensitivity analyses
 
@@ -108,6 +108,7 @@ From the `03_EFA_CFA` directory, run:
 
 ```bash
 Rscript scripts/01_fit_GGE_retained_CFA.R /path/to/GGE_ldsc_corrected_prevalence_Aug2026.rds
+Rscript scripts/02_fit_FE_retained_CFA.R /path/to/FE_subtypes_brain_ldsc_July2026.rds
 ```
 
 The script fits the retained GGE model and saves the model-fit statistics, parameter estimates, model syntax, R session information and input provenance under:
