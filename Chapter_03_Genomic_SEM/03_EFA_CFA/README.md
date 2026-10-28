@@ -41,13 +41,11 @@ The residual variance of CAE was constrained to zero to address a boundary estim
 | CFI | 0.916 |
 | SRMR | 0.075 |
 | AIC | 122.47 |
-| Latent-factor correlation | Approximately −0.17 |
+| Latent-factor correlation | −0.166 |
 
 Both CFI and SRMR met the prespecified fit criteria.
 
-The corrected GGE CFA was verified against the prevalence-corrected August LDSC covariance object, reproducing the fit statistics reported in Appendix Table A8. Standardised factor loadings and their standard errors agreed with Appendix Table A9 to the reported precision.
-
-An earlier reproduction using the original July six-region LDSC object produced χ² = 82.54 and AIC = 122.54. Those values reflect the earlier covariance specification and should not be substituted for the corrected results reported above.
+The retained GGE CFA model was reproduced using the corrected August LDSC covariance object (`GGE_ldsc_corrected_prevalence_Aug2026.rds`). The resulting model-fit statistics, standardised factor loadings, standard errors and latent-factor correlation agreed with Appendix Tables A8 and A9.
 
 ### Retained FE model
 
@@ -65,7 +63,7 @@ The retained model produced the following fit statistics:
 | CFI | 0.863 |
 | SRMR | 0.077 |
 | AIC | 108.30 |
-| Latent-factor correlation | -0.095 |
+| Latent-factor correlation | −0.095 |
 
 The FE model met the SRMR criterion but not the prespecified CFI threshold, indicating mixed evidence of model fit.
 
@@ -73,35 +71,4 @@ The retained FE CFA model was reproduced using `ldsc_FE_brain_6region.rds`. Its 
 
 ## Sensitivity analyses
 
-Additional CFA sensitivity analyses were conducted to assess model stability and the influence of individual indicators.
-
-For GGE, these included excluding CAE and evaluating an alternative specification that separated the six retained brain volumes into correlated striatal/thalamic and limbic factors.
-
-For FE, sensitivity analyses separately excluded F-Oth and F-HS. Where only two FE indicators remained, their factor loadings were constrained to equality for model identification.
-
-The full model comparisons and sensitivity findings are reported in the Chapter 3 appendix.
-
-## Reproducibility and archived inputs
-
-The original model-development scripts, including GGE_modelling_July2026.R and FE_modelling_July2026.R, contain exploratory and retained model specifications.
-
-The final GGE CFA results were obtained using LDSC covariance estimates with the corrected population prevalences for CAE (0.00035) and JME (0.00015). Earlier LDSC covariance objects are retained for provenance but should not be used to reproduce the corrected GGE results. Input preparation and verification are documented in 02_GenomicSEM_LDSC.
-
-Original covariance objects and large intermediate files are retained in research archives rather than distributed in this repository.
-
-**Original July covariance objects:**
-
-- `ldsc_GGE_brain_6region.rds`
-- `ldsc_FE_brain_6region.rds`
-
-The original GGE object reflects the earlier population-prevalence specification in which CAE and JME prevalences were interchanged. It reproduces the earlier GGE CFA fit statistics but is not the corrected reference for the final GGE model.
-
-**Corrected GGE LDSC specification:**
-
-The corrected population prevalences were:
-
-- CAE: 0.00035
-- GTCSA: 0.00020
-- JAE: 0.00015
-- JME: 0.00015
-
+Additional CFA sensitivity analyses were conducted to assess model stability and the influence of
