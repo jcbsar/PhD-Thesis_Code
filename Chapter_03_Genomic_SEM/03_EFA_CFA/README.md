@@ -41,7 +41,7 @@ The residual variance of CAE was constrained to zero to address a boundary estim
 | CFI | 0.916 |
 | SRMR | 0.075 |
 | AIC | 122.47 |
-| Latent-factor correlation | −0.166 |
+| Latent-factor correlation | -0.166 |
 
 Both CFI and SRMR met the prespecified fit criteria.
 
@@ -63,7 +63,7 @@ The retained model produced the following fit statistics:
 | CFI | 0.863 |
 | SRMR | 0.077 |
 | AIC | 108.30 |
-| Latent-factor correlation | −0.095 |
+| Latent-factor correlation | -0.095 |
 
 The FE model met the SRMR criterion but not the prespecified CFI threshold, indicating mixed evidence of model fit.
 
@@ -71,4 +71,49 @@ The retained FE CFA model was reproduced using `ldsc_FE_brain_6region.rds`. Its 
 
 ## Sensitivity analyses
 
-Additional CFA sensitivity analyses were conducted to assess model stability and the influence of
+Additional CFA sensitivity analyses were conducted to assess model stability and the influence of individual indicators.
+
+For GGE, these included excluding CAE and evaluating an alternative specification that separated the six retained brain volumes into correlated striatal/thalamic and limbic factors.
+
+For FE, sensitivity analyses separately excluded F-Oth and F-HS. Where only two FE indicators remained, their factor loadings were constrained to equality for model identification.
+
+The full model comparisons and sensitivity findings are reported in the Chapter 3 appendix.
+
+## Reproducibility and archived inputs
+
+The original model-development scripts, including `GGE_modelling_July2026.R` and `FE_modelling_July2026.R`, contain exploratory and retained model specifications.
+
+The final GGE CFA analyses used the corrected August LDSC covariance object:
+
+`GGE_ldsc_corrected_prevalence_Aug2026.rds`
+
+The corrected population prevalences were:
+
+| Phenotype | Population prevalence |
+|---|---|
+| CAE | 0.00035 |
+| GTCSA | 0.00020 |
+| JAE | 0.00015 |
+| JME | 0.00015 |
+
+The corrected LDSC object contains 11 phenotypes, including brainstem, which is excluded from the retained six-region CFA specification.
+
+### Reproducing the retained GGE CFA
+
+The verified script is:
+
+`scripts/01_fit_GGE_retained_CFA.R`
+
+From the `03_EFA_CFA` directory, run:
+
+```bash
+Rscript scripts/01_fit_GGE_retained_CFA.R /path/to/GGE_ldsc_corrected_prevalence_Aug2026.rds
+```
+
+The script fits the retained GGE model and saves the model-fit statistics, parameter estimates, model syntax, R session information and input provenance under:
+
+`outputs/GGE/`
+
+The standalone script was tested against the corrected August LDSC object and reproduced the final GGE CFA results reported in the thesis.
+
+Input preparation and LDSC verification are documented in `02_GenomicSEM_LDSC`. Original covariance objects and large intermediate data files are retained in research archives rather than distributed in this repository.
