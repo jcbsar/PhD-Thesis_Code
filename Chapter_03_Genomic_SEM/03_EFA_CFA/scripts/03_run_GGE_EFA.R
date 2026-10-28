@@ -167,20 +167,23 @@ for (k in 1:4) {
 
   fit <- efa_models[[paste0("EFA_", k)]]
 
-  L <- as.matrix(fit$loadings)
+# Remove the special "loadings" class before CSV export.
+L <- unclass(fit$loadings)
 
-  write.csv(
-    data.frame(
-      Phenotype = rownames(L),
-      L,
-      check.names = FALSE
-    ),
-    file.path(
-      output_dir,
-      paste0("GGE_EFA_", k, "_loadings.csv")
-    ),
-    row.names = FALSE
-  )
+ loadings_df <- data.frame(
+  Phenotype = rownames(L),
+  as.data.frame.matrix(L),
+  check.names = FALSE
+)
+
+write.csv(
+  loadings_df,
+  file.path(
+    output_dir,
+    paste0("GGE_EFA_", k, "_loadings.csv")
+  ),
+  row.names = FALSE
+)
 
   ss <- colSums(L^2)
   proportion <- ss / nrow(L)
