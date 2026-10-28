@@ -37,9 +37,11 @@ expected_traits <- c(
 
 observed_traits <- colnames(covstruc$S)
 
-valid_input <- (
-  setequal(observed_traits, expected_traits) ||
-  setequal(observed_traits, c(expected_traits, "brainstem"))
+# The verified August CFA input contains 11 phenotypes,
+# including brainstem, which is excluded from the CFA model.
+valid_input <- setequal(
+  observed_traits,
+  c(expected_traits, "brainstem")
 )
 
 if (!valid_input) {
@@ -48,6 +50,22 @@ if (!valid_input) {
     paste(observed_traits, collapse = ", ")
   )
 }
+# Verify the corrected LDSC prevalence specification.
+# The earlier July object had JME h2 = 0.2837976.
+# The corrected August object has JME h2 = 0.2534618.
+
+jme_index <- match("JME", observed_traits)
+jme_h2 <- covstruc$S[jme_index, jme_index]
+
+if (!is.finite(jme_h2) ||
+    abs(jme_h2 - 0.2534618) > 0.001) {
+  stop(
+    "LDSC input does not match the verified corrected ",
+    "August JME heritability. Observed: ", jme_h2
+  )
+}
+
+cat("Verified corrected JME heritability:", jme_h2, "\n")
 
 cat("LDSC input:", input_file, "\n")
 cat("Input phenotypes:", paste(observed_traits, collapse = ", "), "\n")
