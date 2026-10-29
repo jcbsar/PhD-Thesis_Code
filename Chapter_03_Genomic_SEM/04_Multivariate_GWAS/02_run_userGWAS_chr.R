@@ -1,171 +1,330 @@
 
 #!/usr/bin/env Rscript
 
+# ============================================================
+# Chapter 3 — Multivariate GWAS
+# 02. Run Genomic SEM userGWAS by chromosome
+#
+# Analyses:
+#   GGE         Corrected primary GGE + brain model
+#   FE          Primary FE + brain model
+#   GGE_no_CAE  GGE sensitivity model excluding CAE
+#
+# Usage:
+# Rscript 02_run_userGWAS.R ROOT ANALYSIS CHR [CORES]
+# Rscript 02_run_userGWAS.R ROOT ANALYSIS CHR CORES PART PARTS
+#
+# Append --check-only to validate inputs without running GWAS.
+#
+# Each job writes one RDS containing the two factor results.
+# Results are kept separate from historical HPC outputs.
+# ============================================================
+
 suppressPackageStartupMessages({
-  library(GenomicSEM)
   library(data.table)
+  library(GenomicSEM)
 })
+
+# ------------------------------------------------------------
+# 1. Command-line arguments
+# ------------------------------------------------------------
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if (length(args) != 3L) {
-  stop("Usage: Rscript 02_run_userGWAS_chr.R <GGE|FE> <chromosome 1-22> <cores>")
+check_only <- length(args) > 0L &&
+  identical(tail(args, 1L), "--check-only")
+
+if (check_only) {
+  args <- head(args, -1L)
 }
 
-analysis <- toupper(args[[1]])
-chromosome <- as.integer(args[[2]])
-cores <- as.integer(args[[3]])
-
-if (!analysis %in% c("GGE", "FE")) {
-  stop("Analysis must be GGE or FE.")
+if (!(length(args) %in% c(3L, 4L, 6L))) {
+  stop(
+    "Usage: Rscript 02_run_userGWAS.R ",
+    "ROOT ANALYSIS CHR [CORES] [PART PARTS] ",
+    "[--check-only]"
+  )
 }
 
-if (is.na(chromosome) || chromosome < 1L || chromosome > 22L) {
+root <- normalizePath(args[[1]], mustWork = TRUE)
+analysis <- args[[2]]
+chr <- suppressWarnings(as.integer(args[[3]]))
+
+if (!analysis %in% c("GGE", "FE", "GGE_no_CAE")) {
+  stop("Analysis must be GGE, FE or GGE_no_CAE.")
+}
+
+if (is.na(chr) || chr < 1L || chr > 22L) {
   stop("Chromosome must be an integer from 1 to 22.")
 }
 
-if (is.na(cores) || cores < 1L) {
-  stop("Cores must be a positive integer.")
+cores <- if (length(args) >= 4L) {
+  suppressWarnings(as.integer(args[[4]]))
+} else if (analysis == "GGE_no_CAE") {
+  1L
+} else {
+  4L
 }
 
-root_dir <- "/scratch/jcbsar002/gsem"
-input_dir <- file.path(root_dir, "input")
-split_root <- file.path(root_dir, "input_by_chr")
-results_root <- file.path(root_dir, "results")
-
-if (analysis == "GGE") {
-
-  covstruc_file <- file.path(
-    input_dir,
-    "ldsc_GGE_brain_6region.rds"
-  )
-
-  snp_file <- file.path(
-    split_root,
-    "GGE_brain",
-    sprintf("chr%02d_sumstats.rds", chromosome)
-  )
-
-  result_dir <- file.path(results_root, "GGE_brain")
-
-  model <- '
-    GGE =~ CAE + GTCS + JAE + JME
-    Brain =~ accumbens + amygdala + caudate + pallidum + putamen + thalamus
-    CAE ~~ 0*CAE
-    GGE ~~ Brain
-    GGE ~ SNP
-    Brain ~ SNP
-  '
-
-  requested_paths <- c("GGE~SNP", "Brain~SNP")
-  path_labels <- c("GGE", "Brain")
-
+part <- if (length(args) == 6L) {
+  suppressWarnings(as.integer(args[[5]]))
 } else {
+  1L
+}
 
-  covstruc_file <- file.path(
-    input_dir,
-    "ldsc_FE_brain_6region.rds"
+parts <- if (length(args) == 6L) {
+  suppressWarnings(as.integer(args[[6]]))
+} else {
+  1L
+}
+
+if (anyNA(c(cores, part, parts)) ||
+    cores < 1L || parts < 1L ||
+    part < 1L || part > parts) {
+  stop("Invalid CPU or chunk arguments.")
+}
+
+# Preserve the serial approach used in the CAE sensitivity
+# analysis; primary models can use multiple CPUs.
+if (analysis == "GGE_no_CAE" && cores != 1L) {
+  stop("GGE_no_CAE must run with one CPU.")
+}
+
+# ------------------------------------------------------------
+# 2. Define the original models
+# ------------------------------------------------------------
+
+brain_traits <- c(
+  "accumbens",
+  "amygdala",
+  "caudate",
+  "pallidum",
+  "putamen",
+  "thalamus"
+)
+
+brain_model <- paste(
+  "Brain =~ accumbens + amygdala + caudate +",
+  "pallidum + putamen + thalamus"
+)
+
+gge_model <- paste(
+  "GGE =~ CAE + GTCS + JAE + JME",
+  brain_model,
+  "CAE ~~ 0*CAE",
+  "GGE ~~ Brain",
+  "GGE ~ SNP",
+  "Brain ~ SNP",
+  sep = "\n"
+)
+
+fe_model <- paste(
+  "FE =~ F_HS + F_Neg + F_Oth",
+  brain_model,
+  "FE ~~ Brain",
+  "FE ~ SNP",
+  "Brain ~ SNP",
+  sep = "\n"
+)
+
+no_cae_model <- paste(
+  "GGE =~ GTCS + JAE + JME",
+  brain_model,
+  "GGE ~~ Brain",
+  "GGE ~ SNP",
+  "Brain ~ SNP",
+  sep = "\n"
+)
+
+# ------------------------------------------------------------
+# 3. Analysis-specific configuration
+# ------------------------------------------------------------
+
+config <- switch(
+  analysis,
+
+  GGE = list(
+    input = "GGE_brain",
+    ldsc = "ldsc_GGE_brain_6region_corrected.rds",
+    traits = c(
+      "CAE", "GTCS", "JAE", "JME", brain_traits
+    ),
+    model = gge_model,
+    paths = c("GGE~SNP", "Brain~SNP"),
+    labels = c("GGE", "Brain")
+  ),
+
+  FE = list(
+    input = "FE_brain",
+    ldsc = "ldsc_FE_brain_6region.rds",
+    traits = c(
+      "F_HS", "F_Neg", "F_Oth", brain_traits
+    ),
+    model = fe_model,
+    paths = c("FE~SNP", "Brain~SNP"),
+    labels = c("FE", "Brain")
+  ),
+
+  GGE_no_CAE = list(
+    input = "GGE_brain",
+    ldsc = "ldsc_GGE_no_CAE_brain_6region.rds",
+    traits = c(
+      "GTCS", "JAE", "JME", brain_traits
+    ),
+    model = no_cae_model,
+    paths = c("GGE~SNP", "Brain~SNP"),
+    labels = c("GGE", "Brain")
   )
+)
 
-  snp_file <- file.path(
-    split_root,
-    "FE_brain",
-    sprintf("chr%02d_sumstats.rds", chromosome)
+# ------------------------------------------------------------
+# 4. Load and validate inputs
+# ------------------------------------------------------------
+
+ldsc_file <- file.path(
+  root, "input", config$ldsc
+)
+
+snp_file <- file.path(
+  root,
+  "input_by_chr",
+  config$input,
+  sprintf("chr%02d_sumstats.rds", chr)
+)
+
+if (!file.exists(ldsc_file)) {
+  stop("Missing LDSC input: ", ldsc_file)
+}
+
+if (!file.exists(snp_file)) {
+  stop("Missing SNP input: ", snp_file)
+}
+
+covstruc <- readRDS(ldsc_file)
+
+k <- length(config$traits)
+
+if (
+  is.null(covstruc$S) ||
+  is.null(covstruc$V) ||
+  is.null(covstruc$I) ||
+  !identical(dim(covstruc$S), c(k, k)) ||
+  !identical(dim(covstruc$I), c(k, k)) ||
+  !identical(dim(covstruc$V), c(k * (k + 1L) / 2L,
+                                k * (k + 1L) / 2L))
+) {
+  stop("LDSC covariance object has unexpected dimensions.")
+}
+
+snps <- as.data.table(readRDS(snp_file))
+
+if (analysis == "GGE_no_CAE") {
+  cae_columns <- c("beta.CAE", "se.CAE")
+
+  if (!all(cae_columns %in% names(snps))) {
+    stop("CAE columns are missing from GGE input.")
+  }
+
+  snps[, (cae_columns) := NULL]
+}
+
+required <- c(
+  "SNP", "CHR", "BP", "A1", "A2", "MAF",
+  unlist(
+    lapply(
+      config$traits,
+      function(x) c(paste0("beta.", x),
+                    paste0("se.", x))
+    ),
+    use.names = FALSE
   )
+)
 
-  result_dir <- file.path(results_root, "FE_brain")
+missing <- setdiff(required, names(snps))
 
-  model <- '
-    FE =~ F_HS + F_Neg + F_Oth
-    Brain =~ accumbens + amygdala + caudate + pallidum + putamen + thalamus
-    FE ~~ Brain
-    FE ~ SNP
-    Brain ~ SNP
-  '
+if (length(missing) > 0L) {
+  stop(
+    "Missing SNP columns: ",
+    paste(missing, collapse = ", ")
+  )
+}
 
-  requested_paths <- c("FE~SNP", "Brain~SNP")
-  path_labels <- c("FE", "Brain")
+if (
+  nrow(snps) == 0L ||
+  anyNA(snps$CHR) ||
+  any(snps$CHR != chr) ||
+  anyNA(snps$SNP) ||
+  uniqueN(snps$SNP) != nrow(snps)
+) {
+  stop("Invalid chromosome SNP data.")
+}
+
+# ------------------------------------------------------------
+# 5. Select the requested chunk
+# ------------------------------------------------------------
+
+total_chr_snps <- nrow(snps)
+
+if (parts > total_chr_snps) {
+  stop("More chunks requested than available SNPs.")
+}
+
+first <- floor((part - 1L) * total_chr_snps / parts) + 1L
+last <- floor(part * total_chr_snps / parts)
+
+snps <- snps[seq.int(first, last)]
+
+cat("\nAnalysis: ", analysis, "\n", sep = "")
+cat("Chromosome: ", chr, "\n", sep = "")
+cat("Chunk: ", part, "/", parts, "\n", sep = "")
+cat("Chunk SNPs: ", nrow(snps), "\n", sep = "")
+cat("CPUs: ", cores, "\n", sep = "")
+cat("LDSC input: ", ldsc_file, "\n", sep = "")
+
+if (check_only) {
+  cat("\nPASS: Inputs validated; GWAS not executed.\n")
+  quit(save = "no", status = 0L)
+}
+
+# ------------------------------------------------------------
+# 6. Protect existing results
+# ------------------------------------------------------------
+
+output_dir <- file.path(
+  root, "results", "consolidated", analysis
+)
+
+output_file <- file.path(
+  output_dir,
+  sprintf(
+    "chr%02d_part%02d_of%02d_paths.rds",
+    chr, part, parts
+  )
+)
+
+if (file.exists(output_file)) {
+  stop("Refusing to overwrite existing result: ", output_file)
 }
 
 dir.create(
-  result_dir,
+  output_dir,
   recursive = TRUE,
   showWarnings = FALSE
 )
 
-prefix <- sprintf("%s_chr%02d", analysis, chromosome)
+# ------------------------------------------------------------
+# 7. Run the multivariate GWAS
+# ------------------------------------------------------------
 
-done_file <- file.path(
-  result_dir,
-  paste0(prefix, ".done")
-)
+started <- Sys.time()
 
-if (file.exists(done_file)) {
-  cat("Completion marker already exists; skipping: ",
-      done_file, "\n", sep = "")
-  quit(save = "no", status = 0)
-}
-
-for (required_file in c(covstruc_file, snp_file)) {
-  if (!file.exists(required_file)) {
-    stop("Missing required input: ", required_file)
-  }
-}
-
-cat(
-  "========================================\n",
-  "Analysis: ", analysis, "\n",
-  "Chromosome: ", chromosome, "\n",
-  "Cores: ", cores, "\n",
-  "GenomicSEM version: ", as.character(packageVersion("GenomicSEM")), "\n",
-  "R version: ", R.version.string, "\n",
-  "========================================\n",
-  sep = ""
-)
-
-covstruc <- readRDS(covstruc_file)
-SNPs <- as.data.table(readRDS(snp_file))
-
-required_snp_columns <- c(
-  "SNP", "CHR", "BP", "A1", "A2", "MAF"
-)
-
-missing_snp_columns <- setdiff(
-  required_snp_columns,
-  names(SNPs)
-)
-
-if (length(missing_snp_columns) > 0L) {
-  stop(
-    "Chromosome summary statistics are missing: ",
-    paste(missing_snp_columns, collapse = ", ")
-  )
-}
-
-if (nrow(SNPs) == 0L) {
-  stop("No SNPs were loaded.")
-}
-
-if (any(as.integer(SNPs$CHR) != chromosome)) {
-  stop("The chromosome file contains rows from another chromosome.")
-}
-
-cat(
-  "SNPs loaded: ",
-  format(nrow(SNPs), big.mark = ","),
-  "\n",
-  sep = ""
-)
-
-start_time <- Sys.time()
-
-result <- GenomicSEM::userGWAS(
+results <- GenomicSEM::userGWAS(
   covstruc = covstruc,
-  SNPs = SNPs,
+  SNPs = snps,
   estimation = "DWLS",
-  model = model,
+  model = config$model,
   printwarn = TRUE,
-  sub = requested_paths,
+  sub = config$paths,
   cores = cores,
   toler = FALSE,
   SNPSE = FALSE,
@@ -173,124 +332,117 @@ result <- GenomicSEM::userGWAS(
   GC = "standard",
   MPI = FALSE,
   smooth_check = TRUE,
+  TWAS = FALSE,
   std.lv = FALSE,
   fix_measurement = TRUE,
   Q_SNP = TRUE
 )
 
-end_time <- Sys.time()
-
-runtime_minutes <- as.numeric(
-  difftime(end_time, start_time, units = "mins")
-)
-
-if (!is.list(result) || length(result) != length(requested_paths)) {
+if (!is.list(results) ||
+    length(results) != length(config$paths)) {
   stop("Unexpected userGWAS result structure.")
 }
 
-result_rds <- file.path(
-  result_dir,
-  paste0(prefix, "_all_paths.rds")
+# ------------------------------------------------------------
+# 8. Validate both factor outputs
+# ------------------------------------------------------------
+
+names(results) <- config$labels
+
+for (label in config$labels) {
+
+  tab <- as.data.table(results[[label]])
+
+  if (!all(c("SNP", "CHR", "BP") %in% names(tab))) {
+    stop(label, ": missing essential result columns.")
+  }
+
+  if (nrow(tab) != nrow(snps)) {
+    stop(label, ": result row count mismatch.")
+  }
+
+  if (
+    anyNA(tab$SNP) ||
+    uniqueN(tab$SNP) != nrow(tab) ||
+    !setequal(
+      as.character(tab$SNP),
+      as.character(snps$SNP)
+    )
+  ) {
+    stop(label, ": SNP identifiers do not match input.")
+  }
+
+  if ("error" %in% names(tab)) {
+    errors <- as.character(tab$error)
+
+    if (any(
+      !is.na(errors) &
+        nzchar(trimws(errors))
+    )) {
+      stop(label, ": nonempty model errors detected.")
+    }
+  }
+
+  results[[label]] <- tab
+}
+
+# ------------------------------------------------------------
+# 9. Save results and provenance
+# ------------------------------------------------------------
+
+output <- list(
+  analysis = analysis,
+  chromosome = chr,
+  part = part,
+  parts = parts,
+  chromosome_total_snps = total_chr_snps,
+  chunk_snps = nrow(snps),
+  ldsc_file = ldsc_file,
+  snp_file = snp_file,
+  traits = config$traits,
+  model = config$model,
+  paths = config$paths,
+  settings = list(
+    estimation = "DWLS",
+    cores = cores,
+    parallel = cores > 1L,
+    GC = "standard",
+    smooth_check = TRUE,
+    fix_measurement = TRUE,
+    Q_SNP = TRUE,
+    toler = FALSE,
+    SNPSE = FALSE,
+    MPI = FALSE,
+    std.lv = FALSE
+  ),
+  results = results,
+  runtime_minutes = as.numeric(
+    difftime(Sys.time(), started, units = "mins")
+  ),
+  session_info = capture.output(sessionInfo())
+)
+
+temporary_file <- tempfile(
+  pattern = "userGWAS_",
+  tmpdir = output_dir,
+  fileext = ".rds"
 )
 
 saveRDS(
-  result,
-  result_rds,
+  output,
+  temporary_file,
   compress = "gzip"
 )
 
-path_summaries <- vector(
-  "list",
-  length(result)
-)
-
-for (i in seq_along(result)) {
-
-  result_dt <- as.data.table(result[[i]])
-
-  out_file <- file.path(
-    result_dir,
-    paste0(prefix, "_", path_labels[[i]], ".csv.gz")
-  )
-
-  fwrite(
-    result_dt,
-    out_file,
-    sep = ",",
-    quote = FALSE,
-    na = "NA",
-    compress = "gzip"
-  )
-
-  error_count <- if ("error" %in% names(result_dt)) {
-    sum(
-      !is.na(result_dt$error) &
-        !as.character(result_dt$error) %in% c("", "0", "FALSE")
-    )
-  } else {
-    NA_integer_
-  }
-
-  max_z_smooth <- if (
-    "Z_smooth" %in% names(result_dt) &&
-    any(is.finite(result_dt$Z_smooth))
-  ) {
-    max(result_dt$Z_smooth, na.rm = TRUE)
-  } else {
-    NA_real_
-  }
-
-  path_summaries[[i]] <- data.table(
-    analysis = analysis,
-    chromosome = chromosome,
-    path = requested_paths[[i]],
-    label = path_labels[[i]],
-    rows = nrow(result_dt),
-    errors = error_count,
-    maximum_Z_smooth = max_z_smooth,
-    output_file = out_file
-  )
+if (file.exists(output_file)) {
+  unlink(temporary_file)
+  stop("Output appeared during execution; refusing overwrite.")
 }
 
-summary_dt <- rbindlist(path_summaries)
+if (!file.rename(temporary_file, output_file)) {
+  unlink(temporary_file)
+  stop("Failed to finalise output file.")
+}
 
-summary_dt[, runtime_minutes := round(runtime_minutes, 2)]
-summary_dt[, cores := cores]
-summary_dt[, GenomicSEM_version := as.character(packageVersion("GenomicSEM"))]
-
-fwrite(
-  summary_dt,
-  file.path(result_dir, paste0(prefix, "_summary.csv"))
-)
-
-writeLines(
-  capture.output(sessionInfo()),
-  file.path(result_dir, paste0(prefix, "_session_info.txt"))
-)
-
-writeLines(
-  c(
-    paste0("analysis=", analysis),
-    paste0("chromosome=", chromosome),
-    paste0(
-      "completed=",
-      format(Sys.time(), tz = "Africa/Johannesburg")
-    ),
-    paste0("runtime_minutes=", round(runtime_minutes, 2)),
-    paste0("snps=", nrow(SNPs)),
-    paste0(
-      "GenomicSEM_version=",
-      as.character(packageVersion("GenomicSEM"))
-    )
-  ),
-  done_file
-)
-
-cat(
-  "\nCompleted successfully.\n",
-  "Runtime: ", round(runtime_minutes, 2),
-  " minutes\nCompletion marker: ",
-  done_file,
-  "\n",
-  sep = ""
-)
+cat("\nPASS: GWAS completed and validated.\n")
+cat("Saved: ", output_file, "\n", sep = "")
