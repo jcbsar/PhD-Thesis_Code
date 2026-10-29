@@ -210,12 +210,13 @@ if (
   is.null(covstruc$I) ||
   !identical(dim(covstruc$S), c(k, k)) ||
   !identical(dim(covstruc$I), c(k, k)) ||
-  !identical(dim(covstruc$V), c(k * (k + 1L) / 2L,
-                                k * (k + 1L) / 2L))
+  !identical(
+    dim(covstruc$V),
+    rep(as.integer(k * (k + 1L) / 2L), 2L)
+  )
 ) {
   stop("LDSC covariance object has unexpected dimensions.")
 }
-
 snps <- as.data.table(readRDS(snp_file))
 
 if (analysis == "GGE_no_CAE") {
