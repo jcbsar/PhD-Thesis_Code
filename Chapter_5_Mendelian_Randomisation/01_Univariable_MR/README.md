@@ -1,16 +1,82 @@
 # Univariable Mendelian Randomisation
 
-This directory contains the R scripts supporting the univariable two-sample Mendelian randomisation analyses presented in Chapter 5 of the thesis *From genetic risk to brain structure: An integrative investigation of epilepsy and functional dissociative seizures*.
+This directory contains the R code used to reproduce the forward two-sample univariable Mendelian randomisation (MR) analyses presented in Chapter 5 of the PhD thesis, *From genetic risk to brain structure: An integrative investigation of epilepsy and functional dissociative seizures*.
 
-The analyses investigated four exposures:
+## Overview
 
-- Educational attainment
-- Type 2 diabetes
-- Stroke
-- Major depressive disorder
+The analyses investigated associations between genetically proxied liability to four exposures and ten epilepsy outcomes using GWAS summary statistics.
 
-Each exposure was investigated in relation to ten epilepsy outcomes, giving 40 primary exposure–outcome comparisons.
+**Exposures:** Educational attainment, type 2 diabetes (T2D), any ischaemic stroke, and major depressive disorder (MDD).
 
-Inverse-variance-weighted Mendelian randomisation was the primary analytical method, with MR-Egger, weighted median and MR-RAPS sensitivity analyses. Additional analyses assessed heterogeneity, horizontal pleiotropy and potential outliers using Cochran's Q, the MR-Egger intercept and MR-PRESSO.
+**Epilepsy outcomes:** All epilepsy, focal epilepsy (FE), genetic generalised epilepsy (GGE), focal hippocampal sclerosis epilepsy (F-HS), focal lesion-negative epilepsy (F-Neg), focal other lesion epilepsy (F-Oth), generalised tonic-clonic seizures alone (GTCSA), juvenile absence epilepsy (JAE), juvenile myoclonic epilepsy (JME), and childhood absence epilepsy (CAE).
 
-The scripts and reproducibility documentation will be added following verification against the final results reported in the thesis.
+The analysis comprised 40 exposure–outcome comparisons, with inverse variance weighted (IVW) MR as the primary method. MR-Egger regression, weighted median and MR-RAPS were performed as sensitivity analyses.
+
+## Scripts
+
+| Script | Description |
+|---|---|
+| `01_run_univariable_mr.R` | Performs SNP matching, allele harmonisation and four MR estimation methods for all 40 forward exposure–outcome comparisons |
+
+The script processes one epilepsy outcome dataset at a time to reduce memory requirements.
+
+## Input data
+
+The script uses previously prepared and LD-clumped exposure instruments and cleaned ILAE 2023 epilepsy GWAS outcome datasets stored as RDS files.
+
+The original exposure datasets comprised 418 educational attainment instruments, 460 T2D instruments, 23 stroke instruments and 147 MDD instruments before outcome-specific SNP matching and harmonisation.
+
+Input data are not included in this repository. The script requires the original directory structure and filenames specified in its input configuration.
+
+**Scope of reproducibility:** This script reproduces MR estimation from the archived input datasets. It does not independently reproduce the original GWAS processing, SNP selection or LD clumping from raw summary statistics.
+
+## Software requirements
+
+The analysis was implemented in R using `TwoSampleMR`, including its MR-RAPS functionality. The script records the R session information for each run.
+
+## Running the analysis
+
+Set the `MR_DATA_DIR` environment variable in R to the directory containing the archived MR input datasets:
+
+`Sys.setenv(MR_DATA_DIR = "/path/to/MR_data")`
+
+Then execute `01_run_univariable_mr.R` in RStudio or another R environment.
+
+The script validates the required input files, performs all 40 comparisons and checks that 160 MR estimates have been generated.
+
+### Outputs
+
+Results are written to the `Results/Univariable_MR_Reproduction/` directory under `MR_DATA_DIR`.
+
+| Output file | Description |
+|---|---|
+| `01_univariable_MR_results.csv` | Effect estimates, standard errors, p-values, odds ratios and confidence intervals |
+| `02_univariable_MR_run_log.csv` | Instrument counts and completion records for all 40 comparisons |
+| `03_sessionInfo.txt` | R version, platform and package information |
+
+## Reproducibility validation
+
+The reconstructed workflow was executed using the original archived input datasets, and the resulting estimates were compared with the original MR results files.
+
+| Method | Validation outcome |
+|---|---|
+| IVW | All 40 estimates reproduced exactly, including SNP counts, effect estimates, standard errors and p-values |
+| MR-Egger | All 40 estimates reproduced exactly |
+| MR-RAPS | All 40 estimates reproduced to near-numerical precision |
+| Weighted median | All 40 effect estimates reproduced exactly; bootstrap-derived standard errors and p-values varied between runs |
+
+The weighted-median differences reflect variation in bootstrap-based uncertainty estimation. In the validation run, two secondary significance classifications changed: educational attainment–GGE at p = 0.00125 and T2D–GTCSA at p = 0.05.
+
+The primary IVW findings were unaffected. Five educational attainment associations met the Bonferroni-corrected threshold of p < 0.00125, while no T2D, stroke or MDD associations met this threshold.
+
+Fixed random seeds are used for the reconstructed analyses. Exact reproduction of bootstrap uncertainty estimates across different software environments is not guaranteed.
+
+## Additional diagnostic analyses
+
+Cochran's Q heterogeneity tests, MR-Egger intercept tests and MR-PRESSO analyses are evaluated separately from the four MR estimation methods implemented in this script. These diagnostics are not generated by `01_run_univariable_mr.R`.
+
+## Data availability and interpretation
+
+The code is provided for transparency and reproducibility. Access to the underlying GWAS summary statistics and derived datasets is subject to the conditions established by their respective data providers.
+
+MR findings should be interpreted in the context of instrument validity, horizontal pleiotropy, statistical power, population ancestry and other methodological limitations discussed in the thesis.
