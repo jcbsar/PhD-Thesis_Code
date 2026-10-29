@@ -119,7 +119,7 @@ The retained model produced the following fit statistics:
 | CFI | 0.863 |
 | SRMR | 0.077 |
 | AIC | 108.30 |
-| Latent-factor correlation | −0.095 |
+| Latent-factor correlation | -0.095 |
 
 The FE model met the SRMR criterion but not the prespecified CFI threshold, indicating mixed evidence of model fit.
 
@@ -151,7 +151,7 @@ The three-factor model used the following indicator groupings:
 
 In the unconstrained three-factor model, the F-HS residual variance was marginally negative (approximately −0.00277), representing a Heywood case. Its standardised loading was consequently slightly greater than one.
 
-Constraining the F-HS residual variance to zero produced an admissible boundary-constrained specification that reproduced the fit statistics reported in Appendix Table A14.
+Constraining the F-HS residual variance to zero produced a boundary-constrained specification that reproduced the fit statistics reported in Appendix Table A14.
 
 The three-factor model had a marginally lower AIC than the two-factor model (107.89 versus 108.30), a difference of approximately 0.42. However, neither model met the prespecified CFI threshold. The two-factor model was retained based on parsimony and interpretability, and the FE analyses were considered exploratory.
 
@@ -161,17 +161,70 @@ The three-factor model had a marginally lower AIC than the two-factor model (107
 
 Additional CFA sensitivity analyses were conducted to assess model stability and the influence of individual indicators.
 
-For GGE, these included excluding CAE and evaluating an alternative specification that separated the six retained brain volumes into correlated striatal/thalamic and limbic factors.
+### GGE sensitivity analyses
 
-For FE, sensitivity analyses separately excluded F-Oth and F-HS. Where only two FE indicators remained, their factor loadings were constrained to equality for model identification.
+The GGE analyses included two sensitivity specifications:
 
-The final archived FE sensitivity models were inspected and their reported fit statistics, FE–brain correlations and equality-constrained loadings were consistent with the Chapter 3 Results.
+1. Exclusion of CAE from the retained two-factor GGE model.
+2. Separation of the six retained brain-volume indicators into correlated striatal/thalamic and limbic factors.
 
-Earlier archived FE sensitivity outputs without the equality constraints produced different, unstable parameter estimates and should not be treated as the final analyses reported in the thesis.
+The three-factor brain-volume specification was independently reproduced as part of the GGE CFA model comparisons in `04_compare_GGE_CFA_models.R`.
 
-The standalone reproduction of the remaining sensitivity analyses is not yet documented in this directory.
+The CAE-exclusion analysis was independently reproduced in `08_run_GGE_CFA_sensitivity.R`, using the corrected August LDSC covariance object (`GGE_ldsc_corrected_prevalence_Aug2026.rds`). The model specification was recovered from the original archived scripts `GGE_no_CAE.R` and `model_GGE_no_CAE.R`.
 
-Further sensitivity analyses and results are reported in Appendix: Chapter 3, Tables A15–A19.
+The CAE-exclusion model retained GTCSA, JAE and JME as indicators of the GGE factor, together with the six-region brain-volume factor. Neither CAE nor brainstem was included in the fitted model.
+
+| Statistic | GGE excluding CAE |
+|---|---:|
+| χ² | 78.21 |
+| Degrees of freedom | 26 |
+| AIC | 116.21 |
+| CFI | 0.883 |
+| SRMR | 0.084 |
+| GGE–brain genetic correlation | -0.181 |
+| Standard error | 0.079 |
+| Nominal p-value | 0.021 |
+
+All estimated indicator residual variances were positive, and no additional boundary constraints were required.
+
+The negative GGE–brain genetic correlation persisted after excluding CAE, suggesting that the primary association was not solely attributable to CAE. However, model fit no longer met either prespecified criterion (CFI ≥ 0.90 or SRMR ≤ 0.08). Accordingly, the sensitivity results were interpreted cautiously.
+
+The AIC values of the retained and CAE-exclusion models were not compared directly because they were fitted to different phenotype sets.
+
+The CAE-exclusion CFA analysis documented here is distinct from the CAE-exclusion multivariate GWAS sensitivity analysis, which was executed separately on the HPC cluster.
+
+### FE sensitivity analyses
+
+The FE sensitivity analyses separately excluded F-Oth and F-HS to assess the influence of individual FE indicators on the estimated FE-brain genetic correlation.
+
+Both models retained the six-region brain-volume factor, comprising accumbens, amygdala, caudate, pallidum, putamen and thalamus. Brainstem was excluded.
+
+Where only two FE indicators remained, their unstandardised factor loadings were constrained to equality for model identification.
+
+The two final sensitivity models were independently reproduced in `07_run_FE_CFA_sensitivity.R` using `FE_subtypes_brain_ldsc_July2026.rds`.
+
+| Statistic | Excluding F-Oth | Excluding F-HS |
+|---|---:|---:|
+| χ² | 64.34 | 67.23 |
+| Degrees of freedom | 20 | 20 |
+| AIC | 96.34 | 99.23 |
+| CFI | 0.842 | 0.846 |
+| SRMR | 0.072 | 0.107 |
+| FE–brain genetic correlation | −0.010 | -0.063 |
+| Standard error | 0.138 | 0.192 |
+| Nominal p-value | 0.962 | 0.455 |
+
+Both models reproduced the final archived verification results in `FE_CFA_final_verification/` and confirmed that the remaining two unstandardised FE loadings were equal.
+
+For the model excluding F-Oth, both unstandardised FE loadings were approximately 0.18006. For the model excluding F-HS, both were approximately 0.10731.
+
+Neither sensitivity analysis provided evidence of a statistically significant FE–brain genetic correlation. However, some loading standard errors were very large, particularly following exclusion of F-Oth, indicating parameter instability. These sensitivity analyses were therefore interpreted cautiously.
+
+Earlier archived FE sensitivity outputs without equality constraints produced different, unstable parameter estimates and were not used as references for the final thesis analyses.
+
+The final sensitivity models were consistent with the estimates reported in the Chapter 3 Results.
+
+Further sensitivity analyses and findings are reported in the Chapter 3 appendix.
 
 ## Reproducibility and archived inputs
 
@@ -183,7 +236,7 @@ The verified reproducibility scripts in this directory use archived LDSC covaria
 
 **GGE analyses**
 
-The final GGE EFA and CFA analyses used the corrected August LDSC covariance object:
+The final GGE EFA, CFA and CFA sensitivity analyses used the corrected August LDSC covariance object:
 
 `GGE_ldsc_corrected_prevalence_Aug2026.rds`
 
@@ -198,26 +251,30 @@ The corrected population prevalences were:
 
 The corrected LDSC object contains 11 phenotypes, including brainstem, which is excluded from the retained six-region CFA specifications.
 
+The corrected JME liability-scale heritability in this object is approximately 0.25346. The GGE CFA sensitivity script checks this value to distinguish the corrected August covariance input from the earlier object.
+
 **FE analyses**
 
-The FE EFA and CFA analyses used:
+The FE EFA, CFA and CFA sensitivity analyses used:
 
 `FE_subtypes_brain_ldsc_July2026.rds`
 
 This object contains three FE subtypes and seven brain-volume phenotypes, including brainstem.
 
-EFA used the full ten-phenotype set. The final CFA model comparisons and retained FE CFA used the nine-phenotype set excluding brainstem.
+EFA used the full ten-phenotype set. The final CFA model comparisons and retained FE CFA used the nine-phenotype set excluding brainstem. The FE sensitivity models used eight observed phenotypes after excluding either F-Oth or F-HS.
 
 ### Verified scripts
 
 | Script | Purpose | Thesis reference |
 |---|---|---|
-| `01_fit_GGE_retained_CFA.R` | Reproduce the retained two-factor GGE CFA | Tables A8–A9 |
-| `02_fit_FE_retained_CFA.R` | Reproduce the retained two-factor FE CFA | Tables A14–A15 |
-| `03_run_GGE_EFA.R` | Reproduce the one- to four-factor GGE EFA solutions | Tables A5–A7 |
+| `01_fit_GGE_retained_CFA.R` | Reproduce the retained two-factor GGE CFA | Tables A8-A9 |
+| `02_fit_FE_retained_CFA.R` | Reproduce the retained two-factor FE CFA | Tables A14-A15 |
+| `03_run_GGE_EFA.R` | Reproduce the one- to four-factor GGE EFA solutions | Tables A5-A7 |
 | `04_compare_GGE_CFA_models.R` | Compare the one-, two- and three-factor GGE CFA specifications | Table A8 |
-| `05_run_FE_EFA.R` | Reproduce the two-, three- and four-factor FE EFA solutions | Tables A11–A13 |
+| `05_run_FE_EFA.R` | Reproduce the two-, three- and four-factor FE EFA solutions | Tables A11-A13 |
 | `06_compare_FE_CFA_models.R` | Compare the one-, two- and three-factor FE CFA specifications, including the F-HS boundary constraint | Table A14 |
+| `07_run_FE_CFA_sensitivity.R` | Reproduce FE CFA sensitivity models excluding F-Oth and F-HS, with equality-constrained loadings | FE sensitivity analyses |
+| `08_run_GGE_CFA_sensitivity.R` | Reproduce the GGE CFA sensitivity analysis excluding CAE using the corrected August LDSC object | GGE sensitivity analysis |
 
 ### Running the analyses
 
@@ -261,6 +318,18 @@ Rscript scripts/05_run_FE_EFA.R /path/to/FE_subtypes_brain_ldsc_July2026.rds
 Rscript scripts/06_compare_FE_CFA_models.R /path/to/FE_subtypes_brain_ldsc_July2026.rds
 ```
 
+**FE CFA sensitivity analyses**
+
+```bash
+Rscript scripts/07_run_FE_CFA_sensitivity.R /path/to/FE_subtypes_brain_ldsc_July2026.rds
+```
+
+**GGE CFA sensitivity excluding CAE**
+
+```bash
+Rscript scripts/08_run_GGE_CFA_sensitivity.R /path/to/GGE_ldsc_corrected_prevalence_Aug2026.rds
+```
+
 ### Outputs
 
 Each script generates its own output directory relative to the location of the script. The paths below assume the scripts are executed from their intended location inside the repository.
@@ -273,24 +342,34 @@ Each script generates its own output directory relative to the location of the s
 | GGE CFA comparison | `outputs/GGE_CFA_comparison/` |
 | FE EFA | `outputs/FE_EFA/` |
 | FE CFA comparison | `outputs/FE_CFA_comparison/` |
+| FE CFA sensitivity | `outputs/FE_CFA_sensitivity/` |
+| GGE CFA sensitivity | `outputs/GGE_CFA_sensitivity/` |
 
 Depending on the analysis, generated outputs include model-fit statistics, parameter estimates, factor loadings, variance summaries, fitted model objects, model syntax, input provenance and R session information.
 
 For the FE CFA comparison, the output files additionally document the F-HS boundary constraint and the provenance of the reconstructed three-factor model.
 
+For the FE CFA sensitivity analyses, the outputs include both fitted models, their fit statistics, FE–brain genetic correlations, standard errors, nominal p-values and verification of the loading equality constraints.
+
+For the GGE CFA sensitivity analysis, the outputs include the fitted CAE-exclusion model, fit statistics, GGE–brain genetic correlation, parameter estimates, residual variance checks and corrected-input provenance.
+
 ### Verification
 
-All six scripts were tested independently using their respective archived LDSC objects, with successful completion and exit status 0.
+All eight scripts were tested independently using their respective archived LDSC covariance objects, with successful completion and exit status 0.
 
 The retained GGE and FE CFA scripts reproduced the reported model-fit statistics and parameter estimates.
 
-The GGE EFA script reproduced the factor-loading patterns and variance summaries in Appendix Tables A5–A7.
+The GGE EFA script reproduced the factor-loading patterns and variance summaries in Appendix Tables A5-A7.
 
 The GGE CFA comparison script reproduced all three model specifications and the fit statistics reported in Appendix Table A8.
 
-The FE EFA script reproduced the factor-loading patterns, uniquenesses and variance summaries in Appendix Tables A11–A13.
+The FE EFA script reproduced the factor-loading patterns, uniquenesses and variance summaries in Appendix Tables A11-A13.
 
-The FE CFA comparison script reproduced the fit statistics of all three models reported in Appendix Table A14. The three-factor specification included the F-HS residual variance constraint described above. The script also independently verified that this residual variance was fixed to zero.
+The FE CFA comparison script reproduced the fit statistics of all three models reported in Appendix Table A14. The reconstructed three-factor specification included the F-HS residual variance constraint described above. The script independently verified that this residual variance was fixed to zero.
+
+The FE CFA sensitivity script reproduced both final equality-constrained sensitivity models, including their model-fit statistics, latent-factor correlations, standard errors, nominal p-values and equal unstandardised FE loadings. These results agreed with the final archived verification models and the Chapter 3 Results.
+
+The GGE CFA sensitivity script reproduced the CAE-exclusion analysis using the corrected August LDSC input. Model-fit statistics, the GGE-brain genetic correlation and its standard error were independently verified. All estimated indicator residual variances were positive, and the standalone admissibility and numerical checks passed.
 
 These verification results establish computational reproducibility of the documented specifications from the archived covariance inputs. They do not imply independent validation of the underlying factor structures or recovery of every original exploratory modelling script.
 
