@@ -373,15 +373,21 @@ for (label in config$labels) {
   }
 
   if ("error" %in% names(tab)) {
-    errors <- as.character(tab$error)
 
-    if (any(
-      !is.na(errors) &
-        nzchar(trimws(errors))
-    )) {
-      stop(label, ": nonempty model errors detected.")
-    }
+  errors <- trimws(as.character(tab$error))
+
+  has_error <- !is.na(errors) &
+    !(errors %in% c("", "0"))
+
+  if (any(has_error)) {
+    stop(
+      label,
+      ": ",
+      sum(has_error),
+      " SNPs have model errors."
+    )
   }
+}
 
   results[[label]] <- tab
 }
