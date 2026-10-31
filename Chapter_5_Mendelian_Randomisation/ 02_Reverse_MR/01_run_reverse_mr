@@ -1,0 +1,728 @@
+
+# ============================================================
+# CHAPTER 5: REVERSE-DIRECTION MENDELIAN RANDOMISATION
+# ============================================================
+#
+# Epilepsy liability -> Educational attainment
+#
+# Exposures:
+#   All epilepsy
+#   GGE
+#   JME
+#
+# Outcome:
+#   Educational attainment (SSGAC 2022)
+#
+# Methods:
+#   IVW, MR-Egger, weighted median, MR-RAPS
+#
+# Diagnostics:
+#   IVW and MR-Egger Cochran's Q
+#   MR-Egger intercept
+#
+# Original instruments and GWAS datasets are read-only.
+# ============================================================
+
+
+# ------------------------------------------------------------
+# 1. REQUIRE PACKAGES
+# ------------------------------------------------------------
+
+if (!requireNamespace("TwoSampleMR", quietly = TRUE)) {
+  stop("TwoSampleMR is required.")
+}
+
+if (!requireNamespace("data.table", quietly = TRUE)) {
+  stop("data.table is required.")
+}
+
+
+# ------------------------------------------------------------
+# 2. CONFIGURE DIRECTORIES
+# ------------------------------------------------------------
+
+root <- Sys.getenv("MR_DATA_DIR", unset = "")
+
+if (!nzchar(root)) {
+  stop("MR_DATA_DIR is not set.")
+}
+
+root <- normalizePath(
+  root,
+  winslash = "/",
+  mustWork = TRUE
+)
+
+reverse_dir <- file.path(
+  root,
+  "Reverse_MR_Epilepsy_Education"
+)
+
+instrument_dir <- file.path(
+  reverse_dir,
+  "Epilepsy_Instruments"
+)
+
+archive_dir <- file.path(
+  reverse_dir,
+  "Results"
+)
+
+output_dir <- file.path(
+  root,
+  "Results",
+  "Reverse_MR_Reproduction"
+)
+
+
+# ------------------------------------------------------------
+# 3. DEFINE INPUT FILES
+# ------------------------------------------------------------
+
+exposure_files <- c(
+  All_Epilepsy =
+    "All_Epilepsy_Instruments_Clumped_P5e8.rds",
+
+  GGE_Epilepsy =
+    "GGE_Epilepsy_Instruments_Clumped_P5e8.rds",
+
+  JME_Epilepsy =
+    "JME_Epilepsy_Instruments_Clumped_P5e8.rds"
+)
+
+exposure_paths <- setNames(
+  file.path(instrument_dir, unname(exposure_files)),
+  names(exposure_files)
+)
+
+education_path <- file.path(
+  root,
+  "educational_attainment_ssgac_2022_eur",
+  "EA4_additive_excl_23andMe.txt",
+  "EA4_additive_excl_23andMe.txt"
+)
+
+archive_file <- file.path(
+  archive_dir,
+  "Reverse_MR_Results_Epilepsy_Education.csv"
+)
+
+required_files <- c(
+  exposure_paths,
+  education_path,
+  archive_file
+)
+
+missing_files <- required_files[
+  !file.exists(required_files)
+]
+
+if (length(missing_files) > 0L) {
+  stop(
+    "Missing input files:\n",
+    paste(missing_files, collapse = "\n")
+  )
+}
+
+
+# ------------------------------------------------------------
+# 4. LOAD EPILEPSY INSTRUMENTS
+# ------------------------------------------------------------
+
+exposures <- lapply(
+  names(exposure_paths),
+  function(exposure_name) {
+
+    dat <- readRDS(
+      exposure_paths[[exposure_name]]
+    )
+
+    required_columns <- c(
+      "SNP",
+      "beta.exposure",
+      "se.exposure",
+      "effect_allele.exposure",
+      "other_allele.exposure",
+      "pval.exposure"
+    )
+
+    if (
+      !is.data.frame(dat) ||
+      !all(required_columns %in% names(dat))
+    ) {
+      stop(
+        "Invalid instrument dataset: ",
+        exposure_name
+      )
+    }
+
+    dat <- dat[
+      !duplicated(dat$SNP),
+      ,
+      drop = FALSE
+    ]
+
+    dat$exposure <- exposure_name
+    dat$id.exposure <- exposure_name
+
+    dat
+  }
+)
+
+names(exposures) <- names(exposure_paths)
+
+cat("\n=== EPILEPSY INSTRUMENTS ===\n")
+
+for (name in names(exposures)) {
+  cat(
+    name,
+    ":",
+    nrow(exposures[[name]]),
+    "SNPs\n"
+  )
+}
+
+instrument_snps <- unique(
+  unlist(
+    lapply(
+      exposures,
+      function(x) as.character(x$SNP)
+    ),
+    use.names = FALSE
+  )
+)
+
+
+# ------------------------------------------------------------
+# 5. LOAD EDUCATIONAL ATTAINMENT GWAS
+# ------------------------------------------------------------
+
+cat("\nReading educational attainment GWAS...\n")
+
+education_full <- data.table::fread(
+  education_path,
+  select = c(
+    "rsID",
+    "Beta",
+    "SE",
+    "Effect_allele",
+    "Other_allele",
+    "EAF_HRC",
+    "P"
+  )
+)
+
+# Match SNPs to the union of epilepsy instruments.
+education_full <- education_full[
+  rsID %in% instrument_snps
+]
+
+education_outcome <- data.frame(
+  SNP = as.character(education_full$rsID),
+  beta.outcome = as.numeric(education_full$Beta),
+  se.outcome = as.numeric(education_full$SE),
+  effect_allele.outcome =
+    as.character(education_full$Effect_allele),
+  other_allele.outcome =
+    as.character(education_full$Other_allele),
+  eaf.outcome = as.numeric(education_full$EAF_HRC),
+  pval.outcome = as.numeric(education_full$P),
+  outcome = "Educational attainment",
+  id.outcome = "Educational attainment",
+  stringsAsFactors = FALSE
+)
+
+# Apply original missing-data exclusions.
+education_outcome <- education_outcome[
+  complete.cases(
+    education_outcome[
+      ,
+      c(
+        "SNP",
+        "beta.outcome",
+        "se.outcome",
+        "effect_allele.outcome",
+        "other_allele.outcome"
+      ),
+      drop = FALSE
+    ]
+  ),
+  ,
+  drop = FALSE
+]
+
+# Preserve the first record per SNP.
+education_outcome <- education_outcome[
+  !duplicated(education_outcome$SNP),
+  ,
+  drop = FALSE
+]
+
+rm(education_full)
+invisible(gc())
+
+cat(
+  "Matching educational attainment variants:",
+  nrow(education_outcome),
+  "\n"
+)
+
+
+# ------------------------------------------------------------
+# 6. DEFINE METHODS AND RESULT CONTAINERS
+# ------------------------------------------------------------
+
+mr_methods <- c(
+  "mr_ivw",
+  "mr_egger_regression",
+  "mr_weighted_median",
+  "mr_raps"
+)
+
+mr_list <- list()
+heterogeneity_list <- list()
+pleiotropy_list <- list()
+flow_list <- list()
+
+
+# ------------------------------------------------------------
+# 7. PERFORM THREE REVERSE MR ANALYSES
+# ------------------------------------------------------------
+
+for (i in seq_along(exposures)) {
+
+  exposure_name <- names(exposures)[i]
+  exposure_dat <- exposures[[i]]
+
+  cat("\n====================================\n")
+  cat("EXPOSURE:", exposure_name, "\n")
+  cat("====================================\n")
+
+  # ----------------------------------------------------------
+  # Match educational attainment SNPs
+  # ----------------------------------------------------------
+
+  outcome_subset <- education_outcome[
+    education_outcome$SNP %in% exposure_dat$SNP,
+    ,
+    drop = FALSE
+  ]
+
+  nsnp_overlap <- nrow(outcome_subset)
+
+  if (nsnp_overlap == 0L) {
+    stop(
+      "No educational attainment SNP overlap for ",
+      exposure_name
+    )
+  }
+
+  # ----------------------------------------------------------
+  # Harmonise alleles
+  # ----------------------------------------------------------
+
+  dat <- TwoSampleMR::harmonise_data(
+    exposure_dat = exposure_dat,
+    outcome_dat = outcome_subset,
+    action = 2
+  )
+
+  dat <- dat[
+    !is.na(dat$mr_keep) &
+      dat$mr_keep,
+    ,
+    drop = FALSE
+  ]
+
+  nsnp <- length(unique(dat$SNP))
+
+  if (nsnp < 3L || nsnp != nrow(dat)) {
+    stop(
+      "Insufficient or duplicate harmonised SNPs: ",
+      exposure_name
+    )
+  }
+
+  cat("Initial SNPs:", nrow(exposure_dat), "\n")
+  cat("Overlapping SNPs:", nsnp_overlap, "\n")
+  cat("Retained SNPs:", nsnp, "\n")
+
+  # ----------------------------------------------------------
+  # MR ESTIMATION
+  # ----------------------------------------------------------
+
+  # Fixed random seed for reproducible weighted-median
+  # bootstrap calculations.
+  #
+  # Historical bootstrap SEs may differ.
+
+  set.seed(20261031L + i)
+
+  mr_result <- TwoSampleMR::mr(
+    dat,
+    method_list = mr_methods
+  )
+
+  if (
+    !is.data.frame(mr_result) ||
+    nrow(mr_result) != 4L ||
+    anyNA(mr_result$b) ||
+    anyNA(mr_result$se) ||
+    anyNA(mr_result$pval)
+  ) {
+    stop(
+      "Incomplete MR estimates for ",
+      exposure_name
+    )
+  }
+
+  mr_result$exposure_label <- exposure_name
+  mr_result$outcome_label <- "Educational attainment"
+
+  mr_result$beta_lci95 <- (
+    mr_result$b - 1.96 * mr_result$se
+  )
+
+  mr_result$beta_uci95 <- (
+    mr_result$b + 1.96 * mr_result$se
+  )
+
+  mr_list[[i]] <- mr_result
+
+  # ----------------------------------------------------------
+  # COCHRAN'S Q HETEROGENEITY
+  # ----------------------------------------------------------
+
+  heterogeneity <- TwoSampleMR::mr_heterogeneity(
+    dat,
+    method_list = c(
+      "mr_ivw",
+      "mr_egger_regression"
+    )
+  )
+
+  if (
+    !is.data.frame(heterogeneity) ||
+    nrow(heterogeneity) != 2L
+  ) {
+    stop(
+      "Incomplete heterogeneity results for ",
+      exposure_name
+    )
+  }
+
+  heterogeneity$exposure_label <- exposure_name
+  heterogeneity$outcome_label <- "Educational attainment"
+
+  heterogeneity_list[[i]] <- heterogeneity
+
+  # ----------------------------------------------------------
+  # MR-EGGER INTERCEPT
+  # ----------------------------------------------------------
+
+  pleiotropy <- TwoSampleMR::mr_pleiotropy_test(
+    dat
+  )
+
+  if (
+    !is.data.frame(pleiotropy) ||
+    nrow(pleiotropy) != 1L
+  ) {
+    stop(
+      "Incomplete Egger intercept result for ",
+      exposure_name
+    )
+  }
+
+  pleiotropy$exposure_label <- exposure_name
+  pleiotropy$outcome_label <- "Educational attainment"
+
+  pleiotropy_list[[i]] <- pleiotropy
+
+  # ----------------------------------------------------------
+  # INSTRUMENT FLOW
+  # ----------------------------------------------------------
+
+  flow_list[[i]] <- data.frame(
+    exposure = exposure_name,
+    nsnp_initial = nrow(exposure_dat),
+    nsnp_overlap = nsnp_overlap,
+    nsnp_harmonised = nsnp,
+    stringsAsFactors = FALSE
+  )
+
+  cat("\nMR estimates:\n")
+
+  print(
+    mr_result[
+      ,
+      c("method", "nsnp", "b", "se", "pval")
+    ],
+    row.names = FALSE
+  )
+}
+
+
+# ------------------------------------------------------------
+# 8. COMBINE RESULTS
+# ------------------------------------------------------------
+
+all_mr <- do.call(rbind, mr_list)
+
+all_heterogeneity <- do.call(
+  rbind,
+  heterogeneity_list
+)
+
+all_pleiotropy <- do.call(
+  rbind,
+  pleiotropy_list
+)
+
+all_flow <- do.call(rbind, flow_list)
+
+
+# ------------------------------------------------------------
+# 9. VALIDATE COMPLETENESS
+# ------------------------------------------------------------
+
+stopifnot(
+  nrow(all_mr) == 12L,
+  nrow(all_heterogeneity) == 6L,
+  nrow(all_pleiotropy) == 3L,
+  nrow(all_flow) == 3L
+)
+
+expected_harmonised_counts <- c(
+  All_Epilepsy = 4L,
+  GGE_Epilepsy = 19L,
+  JME_Epilepsy = 3L
+)
+
+stopifnot(
+  identical(
+    as.integer(all_flow$nsnp_harmonised),
+    as.integer(
+      expected_harmonised_counts[all_flow$exposure]
+    )
+  )
+)
+
+
+# ------------------------------------------------------------
+# 10. VALIDATE PRIMARY IVW RESULTS AGAINST ARCHIVE
+# ------------------------------------------------------------
+
+archived <- read.csv(
+  archive_file,
+  stringsAsFactors = FALSE
+)
+
+archived_ivw <- archived[
+  archived$method == "Inverse variance weighted",
+  ,
+  drop = FALSE
+]
+
+new_ivw <- all_mr[
+  all_mr$method == "Inverse variance weighted",
+  ,
+  drop = FALSE
+]
+
+comparison <- merge(
+  new_ivw,
+  archived_ivw,
+  by = "exposure_label",
+  suffixes = c("_new", "_archive")
+)
+
+stopifnot(nrow(comparison) == 3L)
+
+numeric_fields <- c("b", "se", "pval")
+
+max_differences <- sapply(
+  numeric_fields,
+  function(field) {
+    max(abs(
+      comparison[[paste0(field, "_new")]] -
+      comparison[[paste0(field, "_archive")]]
+    ))
+  }
+)
+
+snp_match <- all(
+  comparison$nsnp_new == comparison$nsnp_archive
+)
+
+all_match <- (
+  snp_match &&
+  all(is.finite(max_differences)) &&
+  all(max_differences < 1e-8)
+)
+
+cat("\n=== REVERSE IVW VALIDATION ===\n")
+
+cat(
+  "Comparisons:",
+  nrow(comparison),
+  "\n"
+)
+
+cat(
+  "SNP counts match:",
+  snp_match,
+  "\n"
+)
+
+cat("\nMaximum numerical differences:\n")
+print(max_differences)
+
+cat(
+  "\nALL REVERSE IVW RESULTS MATCH:",
+  all_match,
+  "\n"
+)
+
+if (!all_match) {
+  stop("Reverse MR IVW validation failed.")
+}
+
+
+# ------------------------------------------------------------
+# 11. SAVE REPRODUCED OUTPUTS
+# ------------------------------------------------------------
+
+dir.create(
+  output_dir,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+write.csv(
+  all_mr[
+    ,
+    c(
+      "exposure_label",
+      "outcome_label",
+      "method",
+      "nsnp",
+      "b",
+      "se",
+      "pval",
+      "beta_lci95",
+      "beta_uci95"
+    )
+  ],
+  file.path(
+    output_dir,
+    "01_reverse_MR_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  all_heterogeneity[
+    ,
+    c(
+      "exposure_label",
+      "outcome_label",
+      "method",
+      "Q",
+      "Q_df",
+      "Q_pval"
+    )
+  ],
+  file.path(
+    output_dir,
+    "02_reverse_heterogeneity_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  all_pleiotropy[
+    ,
+    c(
+      "exposure_label",
+      "outcome_label",
+      "egger_intercept",
+      "se",
+      "pval"
+    )
+  ],
+  file.path(
+    output_dir,
+    "03_reverse_egger_intercept_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  all_flow,
+  file.path(
+    output_dir,
+    "04_reverse_instrument_flow.csv"
+  ),
+  row.names = FALSE
+)
+
+writeLines(
+  capture.output(sessionInfo()),
+  file.path(
+    output_dir,
+    "05_reverse_sessionInfo.txt"
+  )
+)
+
+
+# ------------------------------------------------------------
+# 12. FINAL SUMMARY
+# ------------------------------------------------------------
+
+cat("\n====================================\n")
+cat("REVERSE MR REPRODUCTION COMPLETE\n")
+cat("====================================\n")
+
+cat(
+  "Reverse comparisons:",
+  nrow(all_flow),
+  "\n"
+)
+
+cat(
+  "MR estimates:",
+  nrow(all_mr),
+  "\n"
+)
+
+cat(
+  "Heterogeneity estimates:",
+  nrow(all_heterogeneity),
+  "\n"
+)
+
+cat(
+  "Egger intercept tests:",
+  nrow(all_pleiotropy),
+  "\n"
+)
+
+cat("\nPrimary IVW results:\n")
+
+print(
+  all_mr[
+    all_mr$method == "Inverse variance weighted",
+    c(
+      "exposure_label",
+      "nsnp",
+      "b",
+      "se",
+      "pval"
+    )
+  ],
+  row.names = FALSE
+)
+
+cat("\nResults saved in:\n", output_dir, "\n")
+cat("\nReverse MR reproduction successful.\n")
