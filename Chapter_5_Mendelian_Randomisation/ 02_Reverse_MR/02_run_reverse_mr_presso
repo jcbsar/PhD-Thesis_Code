@@ -1,0 +1,323 @@
+
+# ============================================================
+# CHAPTER 5: REVERSE MR-PRESSO VALIDATION
+# Epilepsy -> Educational attainment
+# ============================================================
+#
+# Analyses:
+#   All epilepsy -> Educational attainment
+#   GGE -> Educational attainment
+#
+# JME is excluded from MR-PRESSO because only
+# three instruments were retained after harmonisation.
+#
+# Original MR-PRESSO settings:
+#   OUTLIERtest = TRUE
+#   DISTORTIONtest = TRUE
+#   NbDistribution = 10000
+#   SignifThreshold = 0.05
+# ============================================================
+
+# 1. CHECK PACKAGES
+
+stopifnot(
+  requireNamespace("TwoSampleMR", quietly = TRUE),
+  requireNamespace("MRPRESSO", quietly = TRUE),
+  requireNamespace("data.table", quietly = TRUE)
+)
+
+# 2. PATHS
+
+root <- Sys.getenv("MR_DATA_DIR", unset = "")
+
+if (!nzchar(root)) {
+  stop("MR_DATA_DIR is not set.")
+}
+
+root <- normalizePath(
+  root,
+  winslash = "/",
+  mustWork = TRUE
+)
+
+instrument_dir <- file.path(
+  root,
+  "Reverse_MR_Epilepsy_Education",
+  "Epilepsy_Instruments"
+)
+
+education_path <- file.path(
+  root,
+  "educational_attainment_ssgac_2022_eur",
+  "EA4_additive_excl_23andMe.txt",
+  "EA4_additive_excl_23andMe.txt"
+)
+
+output_dir <- file.path(
+  root,
+  "Results",
+  "Reverse_MR_Reproduction",
+  "MR_PRESSO"
+)
+
+dir.create(
+  output_dir,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+# 3. EPILEPSY EXPOSURES
+
+exposure_files <- c(
+  All_Epilepsy =
+    "All_Epilepsy_Instruments_Clumped_P5e8.rds",
+  GGE_Epilepsy =
+    "GGE_Epilepsy_Instruments_Clumped_P5e8.rds"
+)
+
+exposures <- lapply(
+  names(exposure_files),
+  function(name) {
+
+    dat <- readRDS(
+      file.path(instrument_dir, exposure_files[[name]])
+    )
+
+    dat <- dat[
+      !duplicated(dat$SNP),
+      ,
+      drop = FALSE
+    ]
+
+    dat$exposure <- name
+    dat$id.exposure <- name
+
+    dat
+  }
+)
+
+names(exposures) <- names(exposure_files)
+
+# 4. LOAD EDUCATIONAL ATTAINMENT GWAS
+
+instrument_snps <- unique(
+  unlist(
+    lapply(exposures, function(x) x$SNP),
+    use.names = FALSE
+  )
+)
+
+education_full <- data.table::fread(
+  education_path,
+  select = c(
+    "rsID",
+    "Beta",
+    "SE",
+    "Effect_allele",
+    "Other_allele",
+    "EAF_HRC",
+    "P"
+  )
+)
+
+education_full <- education_full[
+  rsID %in% instrument_snps
+]
+
+education_outcome <- data.frame(
+  SNP = as.character(education_full$rsID),
+  beta.outcome = as.numeric(education_full$Beta),
+  se.outcome = as.numeric(education_full$SE),
+  effect_allele.outcome =
+    as.character(education_full$Effect_allele),
+  other_allele.outcome =
+    as.character(education_full$Other_allele),
+  eaf.outcome = as.numeric(education_full$EAF_HRC),
+  pval.outcome = as.numeric(education_full$P),
+  outcome = "Educational attainment",
+  id.outcome = "Educational attainment",
+  stringsAsFactors = FALSE
+)
+
+education_outcome <- education_outcome[
+  complete.cases(
+    education_outcome[
+      ,
+      c(
+        "SNP",
+        "beta.outcome",
+        "se.outcome",
+        "effect_allele.outcome",
+        "other_allele.outcome"
+      ),
+      drop = FALSE
+    ]
+  ),
+  ,
+  drop = FALSE
+]
+
+education_outcome <- education_outcome[
+  !duplicated(education_outcome$SNP),
+  ,
+  drop = FALSE
+]
+
+rm(education_full)
+invisible(gc())
+
+# 5. ORIGINAL REFERENCE STATISTICS
+
+expected_rss <- c(
+  All_Epilepsy = 252.112793233521,
+  GGE_Epilepsy = 220.479747877104
+)
+
+results <- list()
+
+# 6. RUN BOTH MR-PRESSO ANALYSES
+
+for (i in seq_along(exposures)) {
+
+  exposure_name <- names(exposures)[i]
+  exposure_dat <- exposures[[i]]
+
+  cat("\n====================================\n")
+  cat("REVERSE MR-PRESSO:", exposure_name, "\n")
+  cat("====================================\n")
+
+  outcome_subset <- education_outcome[
+    education_outcome$SNP %in% exposure_dat$SNP,
+    ,
+    drop = FALSE
+  ]
+
+  dat <- TwoSampleMR::harmonise_data(
+    exposure_dat = exposure_dat,
+    outcome_dat = outcome_subset,
+    action = 2
+  )
+
+  dat <- dat[
+    !is.na(dat$mr_keep) & dat$mr_keep,
+    ,
+    drop = FALSE
+  ]
+
+  nsnp <- nrow(dat)
+
+  cat("Harmonised SNPs:", nsnp, "\n")
+
+  stopifnot(
+    nsnp >= 4L,
+    !anyDuplicated(dat$SNP)
+  )
+
+  rownames(dat) <- dat$SNP
+
+  # Fixed seed added for reproducibility.
+  # Original historical simulation seeds are unknown.
+  set.seed(20261031L + i)
+
+  presso <- MRPRESSO::mr_presso(
+    BetaOutcome = "beta.outcome",
+    BetaExposure = "beta.exposure",
+    SdOutcome = "se.outcome",
+    SdExposure = "se.exposure",
+    OUTLIERtest = TRUE,
+    DISTORTIONtest = TRUE,
+    data = dat,
+    NbDistribution = 10000,
+    SignifThreshold = 0.05
+  )
+
+  global <- presso[["MR-PRESSO results"]][["Global Test"]]
+
+  stopifnot(
+    !is.null(global),
+    !is.null(global$RSSobs),
+    !is.null(global$Pvalue)
+  )
+
+  rss_match <- isTRUE(
+    all.equal(
+      as.numeric(global$RSSobs),
+      unname(expected_rss[exposure_name]),
+      tolerance = 1e-8
+    )
+  )
+
+  cat("\nMR-PRESSO GLOBAL TEST\n")
+  print(global)
+
+  cat(
+    "RSS matches original analysis:",
+    rss_match,
+    "\n"
+  )
+
+  if (!rss_match) {
+    stop(
+      "MR-PRESSO RSS validation failed for ",
+      exposure_name
+    )
+  }
+
+  # Preserve global, outlier, distortion and MR results
+  saveRDS(
+    list(
+      exposure = exposure_name,
+      nsnp = nsnp,
+      seed = 20261031L + i,
+      NbDistribution = 10000L,
+      result = presso
+    ),
+    file.path(
+      output_dir,
+      paste0(exposure_name, "_MR_PRESSO.rds")
+    )
+  )
+
+  results[[i]] <- data.frame(
+    exposure = exposure_name,
+    nsnp = nsnp,
+    rssobs = as.numeric(global$RSSobs),
+    global_pval = as.character(global$Pvalue),
+    rss_matches_archive = rss_match
+  )
+
+  rm(dat, presso)
+  invisible(gc())
+}
+
+# 7. SAVE AND SUMMARISE
+
+results_df <- do.call(rbind, results)
+
+stopifnot(
+  nrow(results_df) == 2L,
+  all(results_df$rss_matches_archive)
+)
+
+write.csv(
+  results_df,
+  file.path(
+    output_dir,
+    "06_reverse_MR_PRESSO_global_tests.csv"
+  ),
+  row.names = FALSE
+)
+
+writeLines(
+  capture.output(sessionInfo()),
+  file.path(
+    output_dir,
+    "07_reverse_MR_PRESSO_sessionInfo.txt"
+  )
+)
+
+cat("\n====================================\n")
+cat("REVERSE MR-PRESSO VALIDATION COMPLETE\n")
+cat("====================================\n")
+
+print(results_df, row.names = FALSE)
