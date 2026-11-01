@@ -78,6 +78,12 @@ if (!is.data.frame(dat)) {
   stop("Input must be a data frame.")
 }
 
+# Remove incidental whitespace from source column names.
+names(dat) <- trimws(names(dat))
+
+if (anyDuplicated(names(dat))) {
+  stop("Duplicate column names after whitespace normalisation.")
+}
 # ------------------------------------------------------------
 # 2. VALIDATE SOURCE VARIABLES
 # ------------------------------------------------------------
