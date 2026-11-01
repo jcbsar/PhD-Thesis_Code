@@ -1,34 +1,43 @@
-# PhD Thesis - Analysis Code
+# Chapter 6 — South African pilot neuroimaging study
 
-This repository contains analytical code and supporting materials associated with a PhD thesis investigating epilepsy and functional dissociative seizures (FDS), with a particular focus on genetic architecture, associated risk factors, and neuroimaging characteristics. The repository is organised according to the chapters of the thesis, with code and supporting documentation provided for the respective analyses.
+## Status
+**Reconstruction in progress; not yet validated against restricted final-study data.**
 
-## Repository Structure
+This directory documents the **2026 final-study analyses**, not the 2025 preliminary testing scripts. Source analyses were conducted in R 4.4.2, using measures derived from FreeSurfer 7.4.1. The repository is intended to provide transparent analytical methodology, not an independently executable copy of confidential project data.
 
-### Chapter 3: Genetic Architecture of Epilepsy and Subcortical Brain Volumes
+## Cohort and comparisons
+Final analytical cohort: 150 participants (controls 61; GGE 21; FE 49; FDS 19). Four-level analyses compare each clinical group to controls. Collapsed analyses additionally compare combined epilepsy to controls and to FDS.
 
-This chapter investigates the genetic architecture of epilepsy phenotypes and subcortical brain volumes using linkage disequilibrium score regression (LDSC) and Genomic Structural Equation Modelling (Genomic SEM).
+## Analysis families (as reported in the final thesis)
+| Domain | Outcomes | Covariates | BH-FDR family |
+| --- | --- | --- | --- |
+| Primary subcortical volumes | Nine bilateral/midline ROIs | Diagnosis, age, sex, ICV | Nine ROIs per contrast |
+| Thalamic nuclei | 25 bilateral nuclei | Diagnosis, age, sex, ICV | 25 nuclei per contrast |
+| Hippocampal subfields | 18 bilateral subfields | Diagnosis, age, sex, ICV | 18 subfields per contrast |
+| Amygdala nuclei | Nine bilateral nuclei | Diagnosis, age, sex, ICV | Nine nuclei per contrast |
+| Targeted cortical thickness | 12 ROIs per hemisphere | Diagnosis, age, sex, hemisphere-specific Euler number | 12 ROIs per hemisphere per contrast |
+| Whole-cortex thickness | 34 ROIs per hemisphere | Same as targeted thickness | 34 ROIs per hemisphere per contrast |
+| Whole-cortex surface area | 34 ROIs per hemisphere | Diagnosis, age, sex, ICV, hemisphere-specific Euler number | 34 ROIs per hemisphere per contrast |
 
-The analytical workflow includes:
+The participant with an extreme right-hemisphere Euler number was excluded from specified **sensitivity analyses only**. QC treatments for implausible region-specific values must be applied using an authorised private QC record, not public participant identifiers.
 
-1. **Standalone LDSC:** Estimation of SNP-based heritability and pairwise genetic correlations.
-2. **LDSC within Genomic SEM:** Estimation of genetic covariance and sampling covariance matrices.
-3. **Exploratory and Confirmatory Factor Analyses:** Investigation of latent genetic structures underlying epilepsy subtypes and subcortical brain volumes.
-4. **Multivariate GWAS:** Identification of genetic variants associated with latent factors.
-5. **Sensitivity Analyses:** Assessment of alternative model specifications and robustness of findings.
-6. **Functional Annotation:** Identification and characterisation of associated genetic loci.
+## Data access and privacy
+Participant-level MRI and clinical information is subject to institutional and ethics restrictions and is **not publicly available**. The master file, derived RDS files, individual measurements, participant identifiers, private QC mappings and participant-level diagnostics must not be committed to this repository. Locally authorised users should keep input and outputs outside the Git working tree. The `*.csv` ignore pattern is intentionally conservative; approved aggregate exports may be individually assessed for release.
 
-**[Chapter 3 – Standalone LDSC](Chapter_03_Genomic_SEM/01_standalone_LDSC/README.md)**
+## Reconstructed scripts
+- `01_Data_Preparation_QC/01_prepare_final_dataset.R` — initial, privacy-conscious preparation from an authorised local RDS; this is **not yet the complete final QC pipeline** and should not be used to assert reproduction of published results.
+- `02_Statistical_Analyses/01_primary_subcortical.R` — primary 9-ROI models and a reconstructed nine-ROI log-ventricle sensitivity family.
+- `02_Statistical_Analyses/02_cortical_models.R` — targeted/whole-cortex thickness and surface-area models; optional private QC flag for right-sided sensitivity analyses.
+- Subregional models, figures and numerical result comparisons will be added after source verification.
 
-Additional analytical code is organised and documented within the corresponding chapter directories.
+The local script requires environment variables `ABHGP_INPUT_RDS` and `ABHGP_PRIVATE_OUTPUT_DIR`; the first must point to an authorised final-study data frame, and the second must point to an output directory **outside** the repository.
 
-## Reproducibility
+## Verification issues to resolve
+1. The original 2026 monolithic R script has syntax and object-order issues, including an incomplete `mutate()`, malformed directory creation, and incomplete amygdala analyses. It should be preserved **privately** as a historical original.
+2. The main script's log-transformed lateral ventricle analysis does not implement the nine-ROI BH-FDR sensitivity family described in the appendix. Do not claim reproduction of q = 0.051 until its calculation is recovered.
+3. The note to Appendix Table A4 mentions Euler number for hippocampal subfields, while Chapter 6 Methods and the main source model use age, sex and ICV. Resolve from archived final analytical output before changing models.
+4. Figure scripts depend on objects created interactively and need explicit inputs to be standalone.
+5. The current preparation script requires the authoritative FreeSurfer variable dictionary, private QC flags, and original final input definition before numerical equivalence can be tested.
 
-The repository contains R, Python, and shell scripts, together with relevant configuration files and summary-level analytical outputs. Where applicable, individual analysis directories provide information on software requirements, input data, analytical parameters, and execution procedures. The original GWAS summary statistics and external LD reference datasets are not included. These must be obtained from their respective sources, subject to applicable data-access requirements.
-
-## Data Availability
-
-This repository contains analytical code and selected summary-level results. Individual-level participant data and datasets subject to access restrictions are not included.
-
-## Citation
-
-When using or adapting code from this repository, please cite the associated PhD thesis and relevant methodological publications.
+## Data availability
+The analyses were conducted on restricted clinical and neuroimaging data collected as part of the African Brain Health Genomics Project. Individual-level data and derived imaging measurements are not included due to ethical and institutional restrictions. The analytical code is shared for methodological transparency; reproduction of the results requires authorised access to the original data and documented quality-control decisions.
