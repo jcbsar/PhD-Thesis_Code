@@ -1,43 +1,185 @@
-#  South African pilot neuroimaging study
 
-## Status
-**Reconstruction in progress; not yet validated against restricted final-study data.**
+# South African Pilot Neuroimaging Study
 
-This directory documents the **2026 final-study analyses**, not the 2025 preliminary testing scripts. Source analyses were conducted in R 4.4.2, using measures derived from FreeSurfer 7.4.1. The repository is intended to provide transparent analytical methodology, not an independently executable copy of confidential project data.
+## Overview
 
-## Cohort and comparisons
-Final analytical cohort: 150 participants (controls 61; GGE 21; FE 49; FDS 19). Four-level analyses compare each clinical group to controls. Collapsed analyses additionally compare combined epilepsy to controls and to FDS.
+This directory contains R scripts documenting the final neuroimaging analyses undertaken as part of a South African pilot study comparing structural brain measures among individuals with genetic generalised epilepsy (GGE), focal epilepsy (FE), functional dissociative seizures (FDS), and unaffected controls.
 
-## Analysis families (as reported in the final thesis)
-| Domain | Outcomes | Covariates | BH-FDR family |
+The study formed part of a doctoral thesis entitled *From genetic risk to brain structure: An integrative investigation of epilepsy and functional dissociative seizures*.
+
+The analyses examined group differences in subcortical brain volumes, thalamic nuclei, hippocampal subfields, amygdala nuclei, cortical thickness, and cortical surface area. The objective was to investigate structural neuroanatomical characteristics across diagnostic groups in a South African cohort.
+
+This repository documents the final 2026 analytical workflow rather than the preliminary analyses undertaken during 2025.
+
+**Reproducibility status:** The scripts have been reconstructed and organised from the original August 2026 analytical source. Numerical equivalence with the final thesis results has not yet been established using the restricted final-study data.
+
+## Software and processing
+
+Structural MRI measures were derived using FreeSurfer version 7.4.1, with quality control informed by ENIGMA neuroimaging protocols.
+
+Statistical analyses were undertaken in R version 4.4.2. The reconstructed scripts primarily use `dplyr` and `emmeans`, together with base R statistical functions.
+
+The repository does not contain raw MRI scans, FreeSurfer segmentation files, participant-level measurements, or restricted clinical information.
+
+## Study sample
+
+The final analytical sample comprised 150 participants:
+
+| Diagnostic group | N |
+| --- | ---: |
+| Unaffected controls | 61 |
+| Genetic generalised epilepsy (GGE) | 21 |
+| Focal epilepsy (FE) | 49 |
+| Functional dissociative seizures (FDS) | 19 |
+| **Total** | **150** |
+
+Two diagnostic grouping specifications were examined:
+
+1. **Four-group specification:** Control, GGE, FE and FDS, with each clinical group compared against controls.
+2. **Collapsed specification:** Control, combined epilepsy (GGE and FE) and FDS, with comparisons of epilepsy versus controls, FDS versus controls, and epilepsy versus FDS.
+
+## Statistical analyses
+
+Group differences in regional brain measures were examined using linear regression models, followed by estimated marginal means contrasts.
+
+Benjamini–Hochberg false discovery rate (BH-FDR) correction was applied separately within the specified anatomical outcome families and diagnostic contrasts.
+
+| Analysis | Outcomes | Model covariates | BH-FDR family |
 | --- | --- | --- | --- |
-| Primary subcortical volumes | Nine bilateral/midline ROIs | Diagnosis, age, sex, ICV | Nine ROIs per contrast |
-| Thalamic nuclei | 25 bilateral nuclei | Diagnosis, age, sex, ICV | 25 nuclei per contrast |
-| Hippocampal subfields | 18 bilateral subfields | Diagnosis, age, sex, ICV | 18 subfields per contrast |
-| Amygdala nuclei | Nine bilateral nuclei | Diagnosis, age, sex, ICV | Nine nuclei per contrast |
-| Targeted cortical thickness | 12 ROIs per hemisphere | Diagnosis, age, sex, hemisphere-specific Euler number | 12 ROIs per hemisphere per contrast |
-| Whole-cortex thickness | 34 ROIs per hemisphere | Same as targeted thickness | 34 ROIs per hemisphere per contrast |
-| Whole-cortex surface area | 34 ROIs per hemisphere | Diagnosis, age, sex, ICV, hemisphere-specific Euler number | 34 ROIs per hemisphere per contrast |
+| Primary subcortical volumes | 9 bilateral or midline regions | Age, sex, ICV | 9 regions per contrast |
+| Thalamic nuclei | 25 bilateral nuclei | Age, sex, ICV | 25 nuclei per contrast |
+| Hippocampal subfields | 18 bilateral subfields | Age, sex, ICV | 18 subfields per contrast |
+| Amygdala nuclei | 9 bilateral nuclei | Age, sex, ICV | 9 nuclei per contrast |
+| Targeted cortical thickness | 12 regions per hemisphere | Age, sex, hemisphere-specific Euler number | 12 regions per hemisphere and contrast |
+| Whole-cortex thickness | 34 regions per hemisphere | Age, sex, hemisphere-specific Euler number | 34 regions per hemisphere and contrast |
+| Cortical surface area | 34 regions per hemisphere | Age, sex, ICV, hemisphere-specific Euler number | 34 regions per hemisphere and contrast |
 
-The participant with an extreme right-hemisphere Euler number was excluded from specified **sensitivity analyses only**. QC treatments for implausible region-specific values must be applied using an authorised private QC record, not public participant identifiers.
+ICV denotes intracranial volume.
 
-## Data access and privacy
-Participant-level MRI and clinical information is subject to institutional and ethics restrictions and is **not publicly available**. The master file, derived RDS files, individual measurements, participant identifiers, private QC mappings and participant-level diagnostics must not be committed to this repository. Locally authorised users should keep input and outputs outside the Git working tree. The `*.csv` ignore pattern is intentionally conservative; approved aggregate exports may be individually assessed for release.
+Bilateral subcortical and subregional measures were calculated by summing the corresponding left and right hemisphere volumes, with brainstem volume treated as a midline measure.
 
-## Reconstructed scripts
-- `01_Data_Preparation_QC/01_prepare_final_dataset.R` — initial, privacy-conscious preparation from an authorised local RDS; this is **not yet the complete final QC pipeline** and should not be used to assert reproduction of published results.
-- `02_Statistical_Analyses/01_primary_subcortical.R` — primary 9-ROI models and a reconstructed nine-ROI log-ventricle sensitivity family.
-- `02_Statistical_Analyses/02_cortical_models.R` — targeted/whole-cortex thickness and surface-area models; optional private QC flag for right-sided sensitivity analyses.
-- Subregional models, figures and numerical result comparisons will be added after source verification.
+### Sensitivity analyses
 
-The local script requires environment variables `ABHGP_INPUT_RDS` and `ABHGP_PRIVATE_OUTPUT_DIR`; the first must point to an authorised final-study data frame, and the second must point to an output directory **outside** the repository.
+A log-transformed lateral ventricular volume analysis was undertaken to examine the influence of distributional characteristics on the reported group differences. The reconstructed code applies BH-FDR across the nine-region sensitivity family; equivalence with the original reported adjustment remains unverified.
 
-## Verification issues to resolve
-1. The original 2026 monolithic R script has syntax and object-order issues, including an incomplete `mutate()`, malformed directory creation, and incomplete amygdala analyses. It should be preserved **privately** as a historical original.
-2. The main script's log-transformed lateral ventricle analysis does not implement the nine-ROI BH-FDR sensitivity family described in the appendix. Do not claim reproduction of q = 0.051 until its calculation is recovered.
-3. The note to Appendix Table A4 mentions Euler number for hippocampal subfields, while Chapter 6 Methods and the main source model use age, sex and ICV. Resolve from archived final analytical output before changing models.
-4. Figure scripts depend on objects created interactively and need explicit inputs to be standalone.
-5. The current preparation script requires the authoritative FreeSurfer variable dictionary, private QC flags, and original final input definition before numerical equivalence can be tested.
+Additional right-hemisphere cortical analyses were undertaken following the exclusion of one participant with an extreme right-hemisphere Euler number. This exclusion applied only to the specified sensitivity analyses, not the primary analytical cohort.
 
-## Data availability
-The analyses were conducted on restricted clinical and neuroimaging data collected as part of the African Brain Health Genomics Project. Individual-level data and derived imaging measurements are not included due to ethical and institutional restrictions. The analytical code is shared for methodological transparency; reproduction of the results requires authorised access to the original data and documented quality-control decisions.
+Region-specific cortical quality-control decisions were also incorporated into the final analytical dataset.
+
+## Repository structure
+
+```text
+Pilot_Neuroimaging_Study/
+|
+|-- 01_Data_Preparation_QC/
+|   |-- 01_prepare_final_dataset.R
+|
+|-- 02_Statistical_Analyses/
+|   |-- 01_primary_subcortical.R
+|   |-- 02_subregional_volumes.R
+|   |-- 03_cortical_models.R
+|
+|-- 04_Verification/
+|   |-- 01_verify_imaging_results.R
+|   |-- README.md
+|
+|-- .gitignore
+|-- README.md
+```
+
+### Data preparation and quality control
+
+`01_Data_Preparation_QC/01_prepare_final_dataset.R`
+
+Prepares the final analytical dataset from an authorised local input file, including:
+
+- Diagnostic group definitions and final cohort checks.
+- Primary bilateral subcortical volumes.
+- Bilateral thalamic, hippocampal and amygdala subregional measures.
+- Cortical quality-control adjustments specified in restricted project documentation.
+- A private indicator for the right-hemisphere sensitivity exclusion.
+
+The reconstructed preparation workflow requires an authoritative private anatomical variable dictionary and quality-control manifest. These must be reconciled with the original August 2026 workflow before numerical reproducibility can be established.
+
+### Statistical analyses
+
+`02_Statistical_Analyses/01_primary_subcortical.R`
+
+Fits linear regression models for nine primary subcortical volumes across the four-group and collapsed diagnostic specifications. Includes the reconstructed lateral ventricular sensitivity analysis.
+
+Corresponds to Appendix Table A1.
+
+`02_Statistical_Analyses/02_subregional_volumes.R`
+
+Fits regional linear models for 25 thalamic nuclei, 18 hippocampal subfields and nine amygdala nuclei, with BH-FDR correction performed separately for each anatomical family and diagnostic contrast.
+
+Corresponds to Appendix Tables A2, A4 and A5.
+
+`02_Statistical_Analyses/03_cortical_models.R`
+
+Fits targeted cortical thickness, whole-cortex thickness and cortical surface-area models for both diagnostic specifications, including right-hemisphere sensitivity analyses.
+
+Corresponds to Appendix Tables A3 and A6–A8.
+
+### Verification
+
+`04_Verification/01_verify_imaging_results.R`
+
+Checks analytical output structure, expected comparison counts, selected numerical results and the reported numbers of FDR-significant subregional findings.
+
+The verification script does not establish complete numerical equivalence across every comparison in Appendix Tables A1–A8.
+
+See `04_Verification/README.md` for details.
+
+## Restricted data and execution
+
+The analytical scripts are intended for use only by authorised researchers with access to the approved study data and corresponding quality-control documentation.
+
+The preparation script requires the following environment variables:
+
+| Variable | Description |
+| --- | --- |
+| `ABHGP_INPUT_RDS` | Location of the authorised final-study input dataset |
+| `ABHGP_PRIVATE_OUTPUT_DIR` | Private directory for prepared data and analysis outputs |
+| `ABHGP_SUBREGION_DICTIONARY` | Private CSV mapping bilateral subregional measures to original FreeSurfer variables |
+| `ABHGP_QC_MANIFEST_RDS` | Private RDS containing documented region-specific QC decisions and sensitivity exclusion information |
+
+The preparation script writes `final_prepared_private.rds` to the authorised private output directory.
+
+The primary, subregional and cortical analysis scripts use this prepared dataset. The verification script subsequently reads their aggregate statistical outputs.
+
+Scripts should be executed in the following order:
+
+1. `01_Data_Preparation_QC/01_prepare_final_dataset.R`
+2. `02_Statistical_Analyses/01_primary_subcortical.R`
+3. `02_Statistical_Analyses/02_subregional_volumes.R`
+4. `02_Statistical_Analyses/03_cortical_models.R`
+5. `04_Verification/01_verify_imaging_results.R`
+
+The private dictionary and QC manifest are required supporting inputs, not generated by the public preparation script. The public repository therefore cannot be executed end-to-end without these authorised materials.
+
+## Verification status and outstanding limitations
+
+**Status: Reconstructed analytical code; numerical verification pending.**
+
+The public scripts provide a structured implementation of the analytical methods reported in the final thesis, but they have not yet been executed and validated against the restricted final analytical dataset.
+
+The following issues remain relevant:
+
+- The source-to-bilateral mappings for the 52 subregional outcomes must be verified against the authoritative FreeSurfer variable definitions.
+- The reconstructed QC manifest must accurately reproduce the original final region-specific exclusions and sensitivity analysis decision.
+- The original calculation underlying the reported log-transformed lateral ventricular BH-FDR result requires confirmation.
+- Appendix Table A4 mentions Euler number in the hippocampal subfield model note, whereas the thesis Methods and original analytical code specify adjustment for age, sex and ICV. The reported model should be confirmed against archived final analytical outputs.
+- Selected numerical checks are implemented, but comprehensive numerical verification of every result in Appendix Tables A1–A8 has not been completed.
+
+The original August 2026 analysis source is retained separately as a historical record and is not represented here as a fully standalone executable pipeline.
+
+## Data availability and ethical considerations
+
+The study was conducted using restricted clinical and structural MRI data from the African Brain Health Genomics Project.
+
+Participant-level clinical information, MRI measurements, participant identifiers, individual quality-control decisions, and private data dictionaries are not included in this repository because of ethical and institutional restrictions.
+
+The code is shared to support transparency regarding analytical methods and statistical procedures. Reproduction of the findings requires authorised access to the original data and documented quality-control workflow.
+
+Aggregate statistical outputs should be reviewed for disclosure suitability before public release.
