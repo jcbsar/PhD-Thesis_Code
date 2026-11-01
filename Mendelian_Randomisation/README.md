@@ -1,8 +1,6 @@
-# Chapter 5: Mendelian Randomisation
+# Mendelian Randomisation
 
-This directory contains R scripts and reproducibility documentation for the Mendelian randomisation (MR) analyses presented in Chapter 5 of the PhD thesis, *From genetic risk to brain structure: An integrative investigation of epilepsy and functional dissociative seizures*.
-
-The chapter investigated the potential causal relevance of selected exposures to epilepsy susceptibility using complementary univariable, reverse-direction and multivariable MR approaches.
+The study investigated the potential causal relevance of selected exposures to epilepsy susceptibility using complementary univariable, reverse-direction and multivariable MR approaches. This directory contains R scripts and reproducibility documentation for the Mendelian randomisation (MR) analyses.
 
 ## Repository structure
 
