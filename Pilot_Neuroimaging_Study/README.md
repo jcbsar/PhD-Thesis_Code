@@ -1,4 +1,4 @@
-# Chapter 6 — South African pilot neuroimaging study
+#  South African pilot neuroimaging study
 
 ## Status
 **Reconstruction in progress; not yet validated against restricted final-study data.**
