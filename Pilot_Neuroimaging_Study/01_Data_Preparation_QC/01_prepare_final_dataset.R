@@ -381,6 +381,89 @@ if (
   stop("Regional QC entries do not match source data.")
 }
 
+           
+# ------------------------------------------------------------
+# 6A. VERIFY ORIGINAL CORTICAL QC DECISIONS
+# ------------------------------------------------------------
+
+# These conditions were recovered from the original
+# August 2026 analytical script.
+#
+# Participant identifiers remain in the private QC
+# manifest and are not included in this repository.
+
+qc_expected <- c(
+  "L_entorhinal_thickavg",
+  "L_entorhinal_surfavg",
+  "L_temporalpole_surfavg"
+)
+
+# Exactly three region-specific corrections were
+# documented in the original analytical source.
+
+if (
+  nrow(qc_regions) != 3L ||
+  anyDuplicated(qc_regions$variable) ||
+  anyDuplicated(qc_regions[c("SubjID", "variable")]) ||
+  !setequal(qc_regions$variable, qc_expected)
+) {
+  stop(
+    "Private QC manifest does not match the ",
+    "three original cortical QC decisions."
+  )
+}
+
+# The three corrections concern the same participant.
+
+if (length(unique(qc_regions$SubjID)) != 1L) {
+  stop("Expected one participant for regional QC corrections.")
+}
+
+# Check the source measurements before replacing them.
+
+for (i in seq_len(nrow(qc_regions))) {
+
+  participant <- qc_regions$SubjID[i]
+  variable <- qc_regions$variable[i]
+
+  value <- dat[
+    dat$SubjID == participant,
+    variable
+  ][[1]]
+
+  if (length(value) != 1L || !is.finite(value)) {
+    stop("Missing or invalid original QC measurement.")
+  }
+
+  if (
+    variable %in% c(
+      "L_entorhinal_thickavg",
+      "L_entorhinal_surfavg"
+    ) && value != 0
+  ) {
+    stop(
+      "Original entorhinal QC rule requires ",
+      "a zero measurement."
+    )
+  }
+
+  if (
+    variable == "L_temporalpole_surfavg" &&
+    value > 10
+  ) {
+    stop(
+      "Original temporal pole QC rule requires ",
+      "a measurement <= 10 mm2."
+    )
+  }
+}
+
+message(
+  "Original regional cortical QC conditions verified."
+)
+
+# The existing region-specific NA assignment follows.
+
 # Apply region-specific missing-value corrections.
 
 for (i in seq_len(nrow(qc_regions))) {
