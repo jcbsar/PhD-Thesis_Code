@@ -1,0 +1,20 @@
+# Never commit restricted participant-level data or derived outputs
+*.rds
+*.RData
+*.rda
+*.xlsx
+*.xls
+*.csv
+*.tsv
+*.nii
+*.nii.gz
+*.mgz
+*.mgh
+*.dcm
+*.dicom
+/private/
+/data/
+/outputs/
+/analysis_outputs/
+.Rhistory
+.Rproj.user/

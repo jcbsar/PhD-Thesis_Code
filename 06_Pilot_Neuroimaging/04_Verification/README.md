@@ -1,0 +1,3 @@
+# Verification plan (not yet executed)
+
+Compare generated aggregate statistical results with final thesis Appendix A1–A8, including estimate, SE, confidence intervals, raw p-values and BH-FDR q-values. Verify cohort counts (61/21/49/19), 9 primary ROIs, 25 thalamic nuclei, 18 hippocampal subfields, 9 amygdala nuclei, 12 targeted cortical ROIs per hemisphere, 34 whole-cortex ROIs per hemisphere and sensitivity-test families. Do not publish participant-level outputs or individual QC case details. Verification requires authorised restricted inputs; the supplied source files alone do not establish numerical reproduction.
