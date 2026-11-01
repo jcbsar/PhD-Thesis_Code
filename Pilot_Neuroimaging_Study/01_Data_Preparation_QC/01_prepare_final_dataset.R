@@ -45,10 +45,37 @@ if (!nzchar(output_dir)) {
   stop("Set ABHGP_PRIVATE_OUTPUT_DIR.")
 }
 
-# Prevent outputs from being written into the
-# current repository when run from its root.
+
+# Resolve the actual Git repository root, independently
+# of the current R working directory.
+
+git_executable <- Sys.which("git")
+
+if (!nzchar(git_executable)) {
+  stop("Git is required to verify the private output location.")
+}
+
+repo_root_raw <- suppressWarnings(
+  system2(
+    git_executable,
+    c("rev-parse", "--show-toplevel"),
+    stdout = TRUE,
+    stderr = FALSE
+  )
+)
+
+if (
+  length(repo_root_raw) != 1L ||
+  !is.null(attr(repo_root_raw, "status"))
+) {
+  stop(
+    "Cannot determine Git repository root. ",
+    "Run from within the repository."
+  )
+}
+
 repo_root <- normalizePath(
-  getwd(),
+  trimws(repo_root_raw),
   winslash = "/",
   mustWork = TRUE
 )
@@ -65,12 +92,55 @@ output_dir <- normalizePath(
   mustWork = TRUE
 )
 
-if (
-  output_dir == repo_root ||
-  startsWith(output_dir, paste0(repo_root, "/"))
-) {
-  stop("Private outputs must be outside the repository.")
+# Protect against both the repository itself and
+# directories nested inside it.
+
+is_within <- function(path, parent) {
+  path <- tolower(
+    sub("/+$", "", normalizePath(
+      path, winslash = "/", mustWork = TRUE
+    ))
+  )
+  parent <- tolower(
+    sub("/+$", "", normalizePath(
+      parent, winslash = "/", mustWork = TRUE
+    ))
+  )
+
+  identical(path, parent) ||
+    startsWith(path, paste0(parent, "/"))
 }
+
+if (is_within(output_dir, repo_root)) {
+  stop(
+    "Private outputs must not be written ",
+    "inside the Git repository."
+  )
+}
+
+# Do not overwrite the original input files.
+
+private_input_paths <- normalizePath(
+  private_files,
+  winslash = "/",
+  mustWork = TRUE
+)
+
+if (any(vapply(
+  private_input_paths,
+  is_within,
+  logical(1),
+  parent = repo_root
+))) {
+  stop(
+    "Restricted input data and QC files must be ",
+    "stored outside the Git repository."
+  )
+}
+
+# ------------------------------------------------------------
+# LOAD RESTRICTED SOURCE DATA
+# ------------------------------------------------------------
 
 dat <- readRDS(input_path)
 
@@ -78,12 +148,17 @@ if (!is.data.frame(dat)) {
   stop("Input must be a data frame.")
 }
 
-# Remove incidental whitespace from source column names.
+# The original master workbook contains incidental
+# whitespace in some anatomical column headers.
+
 names(dat) <- trimws(names(dat))
 
 if (anyDuplicated(names(dat))) {
-  stop("Duplicate column names after whitespace normalisation.")
+  stop(
+    "Duplicate column names after whitespace normalisation."
+  )
 }
+
 # ------------------------------------------------------------
 # 2. VALIDATE SOURCE VARIABLES
 # ------------------------------------------------------------
@@ -583,6 +658,85 @@ if (!identical(
     "original August 2026 naming convention."
   )
 }
+           
+# ------------------------------------------------------------
+# 8B. VERIFY HISTORICAL SUBREGIONAL OUTCOME SET
+# ------------------------------------------------------------
+
+# Exact ROI names recovered from the archived
+# August 2026 full-results CSV files.
+#
+# This reference contains anatomical names only.
+# It does not include participant-level information.
+
+archived_rois <- list(
+
+  Thalamus = c(
+    "Thal_AV", "Thal_CL", "Thal_CM", "Thal_CeM",
+    "Thal_LD", "Thal_LGN", "Thal_LP", "Thal_L_Sg",
+    "Thal_MDl", "Thal_MDm", "Thal_MGN",
+    "Thal_MV_Re_", "Thal_Pc", "Thal_Pf",
+    "Thal_Pt", "Thal_PuA", "Thal_PuI",
+    "Thal_PuL", "Thal_PuM", "Thal_VA",
+    "Thal_VAmc", "Thal_VLa", "Thal_VLp",
+    "Thal_VM", "Thal_VPL"
+  ),
+
+  Hippocampus = c(
+    "Hip_CA1_body", "Hip_CA1_head",
+    "Hip_CA3_body", "Hip_CA3_head",
+    "Hip_CA4_body", "Hip_CA4_head",
+    "Hip_GC_ML_DG_body", "Hip_GC_ML_DG_head",
+    "Hip_HATA", "Hip_Hippocampal_tail",
+    "Hip_fimbria",
+    "Hip_molecular_layer_HP_body",
+    "Hip_molecular_layer_HP_head",
+    "Hip_parasubiculum",
+    "Hip_presubiculum_body",
+    "Hip_presubiculum_head",
+    "Hip_subiculum_body",
+    "Hip_subiculum_head"
+  ),
+
+  Amygdala = c(
+    "Amyg_Accessory_Basal_nucleus",
+    "Amyg_Anterior_amygdaloid_area_AAA",
+    "Amyg_Basal_nucleus",
+    "Amyg_Central_nucleus",
+    "Amyg_Cortical_nucleus",
+    "Amyg_Corticoamygdaloid_transitio",
+    "Amyg_Lateral_nucleus",
+    "Amyg_Medial_nucleus",
+    "Amyg_Paralaminar_nucleus"
+  )
+)
+
+for (family in names(archived_rois)) {
+
+  observed <- dictionary$output_name[
+    dictionary$family == family
+  ]
+
+  expected <- archived_rois[[family]]
+
+  if (!setequal(observed, expected)) {
+    stop(
+      "Anatomical outcomes do not match the ",
+      "archived August 2026 results for: ",
+      family,
+      "\nMissing: ",
+      paste(setdiff(expected, observed), collapse = ", "),
+      "\nUnexpected: ",
+      paste(setdiff(observed, expected), collapse = ", ")
+    )
+  }
+}
+
+message(
+  "All 52 subregional outcome names match ",
+  "the archived August 2026 result sets."
+)
+
 
 if (
   anyDuplicated(dictionary$left_column) ||
