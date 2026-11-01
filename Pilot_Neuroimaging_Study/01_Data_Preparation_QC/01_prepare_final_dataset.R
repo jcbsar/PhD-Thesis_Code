@@ -1,84 +1,496 @@
-# Chapter 6 — final ABHGP imaging dataset preparation (2026)
-# Restricted participant-level data MUST remain outside Git.
-# Supply a locally authorised, completed-study master RDS via ABHGP_INPUT_RDS.
-# This is a reconstructed script; numerical equivalence has not yet been established.
+
+# ============================================================
+# PILOT NEUROIMAGING STUDY
+# 01 - FINAL DATA PREPARATION AND QUALITY CONTROL
+#
+# This script prepares the completed-study analytical
+# dataset used for primary subcortical, subregional,
+# cortical thickness and surface-area analyses.
+#
+# Participant-level data, QC decisions and mappings
+# are restricted and are not included in GitHub.
+#
+# Reconstructed from the original 2026 workflow.
+# Numerical equivalence has not yet been verified.
+# ============================================================
 
 suppressPackageStartupMessages({
   library(dplyr)
 })
 
+# ------------------------------------------------------------
+# 1. PRIVATE INPUTS AND OUTPUTS
+# ------------------------------------------------------------
+
 input_path <- Sys.getenv("ABHGP_INPUT_RDS")
 output_dir <- Sys.getenv("ABHGP_PRIVATE_OUTPUT_DIR")
-if (!nzchar(input_path) || !file.exists(input_path)) {
-  stop("Set ABHGP_INPUT_RDS to the authorised local final-study RDS file")
-}
-if (!nzchar(output_dir)) {
-  stop("Set ABHGP_PRIVATE_OUTPUT_DIR to a private location outside the repository")
-}
-dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+dictionary_path <- Sys.getenv("ABHGP_SUBREGION_DICTIONARY")
+qc_path <- Sys.getenv("ABHGP_QC_MANIFEST_RDS")
 
-dat <- readRDS(input_path)
-if (!is.data.frame(dat)) stop("Input must be a data frame")
-required <- c("SubjID", "diagnosis", "age", "sex", "ICV", "Euler_LH", "Euler_RH",
-              "Lthal", "Rthal", "Lcaud", "Rcaud", "Lput", "Rput", "Lpal", "Rpal",
-              "Lhippo", "Rhippo", "Lamyg", "Ramyg", "Laccumb", "Raccumb",
-              "LLatVent", "RLatVent", "Whole_brainstem")
-missing_cols <- setdiff(required, names(dat))
-if (length(missing_cols)) stop("Required fields missing: ", paste(missing_cols, collapse = ", "))
-if (anyDuplicated(dat$SubjID)) stop("Duplicate participant keys detected")
-if (!all(na.omit(unique(dat$diagnosis)) %in% c("Control", "GGE", "FE", "FDS"))) {
-  stop("Unexpected diagnosis values")
-}
-
-# Strict conversion prevents silent coercion of malformed numeric data.
-convert_numeric <- function(x, field) {
-  if (is.numeric(x)) return(x)
-  original <- as.character(x)
-  out <- suppressWarnings(as.numeric(original))
-  bad <- !is.na(original) & trimws(original) != "" & is.na(out)
-  if (any(bad)) stop("Non-numeric entries in ", field, " (", sum(bad), " rows)")
-  out
-}
-raw_volume <- c("Lthal", "Rthal", "Lcaud", "Rcaud", "Lput", "Rput", "Lpal", "Rpal",
-                "Lhippo", "Rhippo", "Lamyg", "Ramyg", "Laccumb", "Raccumb",
-                "LLatVent", "RLatVent", "Whole_brainstem", "ICV")
-# Not every prefixed field is necessarily a measurement; select recognised types only.
-measure_cols <- unique(c(raw_volume, "age", "Euler_LH", "Euler_RH",
-                         grep("_thickavg$|_surfavg$|^Left-|^Right-", names(dat), value = TRUE)))
-for (nm in measure_cols) dat[[nm]] <- convert_numeric(dat[[nm]], nm)
-
-dat <- dat %>% mutate(
-  diagnosis4 = factor(diagnosis, levels = c("Control", "GGE", "FE", "FDS")),
-  diagnosis3 = factor(case_when(
-    diagnosis == "Control" ~ "Control",
-    diagnosis %in% c("GGE", "FE") ~ "Epilepsy",
-    diagnosis == "FDS" ~ "FDS",
-    TRUE ~ NA_character_
-  ), levels = c("Control", "Epilepsy", "FDS")),
-  Thalamus = Lthal + Rthal,
-  Caudate = Lcaud + Rcaud,
-  Putamen = Lput + Rput,
-  Pallidum = Lpal + Rpal,
-  Hippocampus = Lhippo + Rhippo,
-  Amygdala = Lamyg + Ramyg,
-  Accumbens = Laccumb + Raccumb,
-  LateralVentricles = LLatVent + RLatVent,
-  Brainstem = Whole_brainstem,
-  Euler_Mean = (Euler_LH + Euler_RH) / 2
+private_files <- c(
+  input_path,
+  dictionary_path,
+  qc_path
 )
 
-# Explicitly validate final sample. Do not silently filter to desired counts.
-expected <- c(Control = 61L, GGE = 21L, FE = 49L, FDS = 19L)
-observed <- table(dat$diagnosis4)
-if (!identical(as.integer(observed), as.integer(expected))) {
-  stop("Input is not the reported final analytical cohort; observed counts: ",
-       paste(names(observed), observed, collapse = ", "))
+if (any(!nzchar(private_files)) ||
+    !all(file.exists(private_files))) {
+  stop(
+    "Set ABHGP_INPUT_RDS, ABHGP_SUBREGION_DICTIONARY ",
+    "and ABHGP_QC_MANIFEST_RDS to authorised local files."
+  )
 }
 
-# Nuclei/subfields: use an explicit local dictionary rather than a broad prefix
-# match that can unintentionally include unrelated FreeSurfer measurements.
-# The dictionary must be checked against the final 25/18/9 outcome sets.
-# See README; subregional validation will be incorporated in the next module.
+if (!nzchar(output_dir)) {
+  stop("Set ABHGP_PRIVATE_OUTPUT_DIR.")
+}
 
-saveRDS(dat, file.path(output_dir, "final_prepared_private.rds"))
-message("Private prepared dataset written to: ", output_dir)
+# Prevent outputs from being written into the
+# current repository when run from its root.
+repo_root <- normalizePath(
+  getwd(),
+  winslash = "/",
+  mustWork = TRUE
+)
+
+dir.create(
+  output_dir,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+output_dir <- normalizePath(
+  output_dir,
+  winslash = "/",
+  mustWork = TRUE
+)
+
+if (
+  output_dir == repo_root ||
+  startsWith(output_dir, paste0(repo_root, "/"))
+) {
+  stop("Private outputs must be outside the repository.")
+}
+
+dat <- readRDS(input_path)
+
+if (!is.data.frame(dat)) {
+  stop("Input must be a data frame.")
+}
+
+# ------------------------------------------------------------
+# 2. VALIDATE SOURCE VARIABLES
+# ------------------------------------------------------------
+
+primary_raw <- c(
+  "Lthal", "Rthal",
+  "Lcaud", "Rcaud",
+  "Lput", "Rput",
+  "Lpal", "Rpal",
+  "Lhippo", "Rhippo",
+  "Lamyg", "Ramyg",
+  "Laccumb", "Raccumb",
+  "LLatVent", "RLatVent",
+  "Whole_brainstem"
+)
+
+required <- c(
+  "SubjID", "diagnosis",
+  "age", "sex", "ICV",
+  "Euler_LH", "Euler_RH",
+  primary_raw
+)
+
+missing <- setdiff(required, names(dat))
+
+if (length(missing) > 0) {
+  stop(
+    "Missing source variables: ",
+    paste(missing, collapse = ", ")
+  )
+}
+
+if (anyNA(dat$SubjID) ||
+    anyDuplicated(dat$SubjID)) {
+  stop("Missing or duplicated participant keys.")
+}
+
+# ------------------------------------------------------------
+# 3. VALIDATE FINAL COHORT
+# ------------------------------------------------------------
+
+dat$diagnosis4 <- factor(
+  as.character(dat$diagnosis),
+  levels = c("Control", "GGE", "FE", "FDS")
+)
+
+dat$diagnosis3 <- factor(
+  case_when(
+    dat$diagnosis == "Control" ~ "Control",
+    dat$diagnosis %in% c("GGE", "FE") ~ "Epilepsy",
+    dat$diagnosis == "FDS" ~ "FDS",
+    TRUE ~ NA_character_
+  ),
+  levels = c("Control", "Epilepsy", "FDS")
+)
+
+expected_counts <- c(
+  Control = 61L,
+  GGE = 21L,
+  FE = 49L,
+  FDS = 19L
+)
+
+observed_counts <- table(dat$diagnosis4)
+
+stopifnot(
+  nrow(dat) == 150L,
+  !anyNA(dat$diagnosis4),
+  identical(
+    as.integer(observed_counts),
+    as.integer(expected_counts)
+  )
+)
+
+dat$sex <- factor(dat$sex)
+
+# ------------------------------------------------------------
+# 4. LOAD PRIVATE SUBREGION DICTIONARY
+# ------------------------------------------------------------
+
+# Dictionary columns:
+#
+# family        - Thalamus, Hippocampus or Amygdala
+# output_name   - Final bilateral variable name
+# left_column   - Original left measurement
+# right_column  - Original right measurement
+#
+# This dictionary is maintained privately.
+
+dictionary <- read.csv(
+  dictionary_path,
+  stringsAsFactors = FALSE
+)
+
+dictionary_fields <- c(
+  "family",
+  "output_name",
+  "left_column",
+  "right_column"
+)
+
+stopifnot(
+  all(dictionary_fields %in% names(dictionary))
+)
+
+expected_families <- c(
+  Thalamus = 25L,
+  Hippocampus = 18L,
+  Amygdala = 9L
+)
+
+observed_families <- table(
+  factor(
+    dictionary$family,
+    levels = names(expected_families)
+  )
+)
+
+if (
+  nrow(dictionary) != 52L ||
+  anyNA(dictionary[dictionary_fields]) ||
+  any(!nzchar(trimws(
+    as.matrix(dictionary[dictionary_fields])
+  ))) ||
+  !identical(
+    as.integer(observed_families),
+    as.integer(expected_families)
+  ) ||
+  anyDuplicated(dictionary$output_name)
+) {
+  stop("Invalid subregion dictionary.")
+}
+
+prefixes <- c(
+  Thalamus = "Thal_",
+  Hippocampus = "Hip_",
+  Amygdala = "Amyg_"
+)
+
+correct_prefix <- mapply(
+  startsWith,
+  dictionary$output_name,
+  unname(prefixes[dictionary$family])
+)
+
+if (!all(correct_prefix)) {
+  stop("Subregion output naming mismatch.")
+}
+
+source_cols <- unique(c(
+  dictionary$left_column,
+  dictionary$right_column
+))
+
+if (!all(source_cols %in% names(dat))) {
+  stop("Subregion source columns are missing.")
+}
+
+if (any(
+  dictionary$left_column == dictionary$right_column
+)) {
+  stop("Left and right columns must differ.")
+}
+
+# Check against the original FreeSurfer naming
+# conventions used in the August 2026 analysis.
+
+expected_source_prefix <- function(family, side) {
+  if (family == "Thalamus") {
+    return(if (side == "L") "^Left-" else "^Right-")
+  }
+  if (side == "L") "^L_" else "^R_"
+}
+
+for (i in seq_len(nrow(dictionary))) {
+  fam <- dictionary$family[i]
+
+  if (!grepl(
+    expected_source_prefix(fam, "L"),
+    dictionary$left_column[i]
+  ) || !grepl(
+    expected_source_prefix(fam, "R"),
+    dictionary$right_column[i]
+  )) {
+    stop("Unexpected source naming at dictionary row ", i)
+  }
+}
+
+# ------------------------------------------------------------
+# 5. CONVERT MEASUREMENTS TO NUMERIC
+# ------------------------------------------------------------
+
+convert_numeric <- function(x, field) {
+  if (is.numeric(x)) return(x)
+
+  original <- as.character(x)
+  converted <- suppressWarnings(
+    as.numeric(original)
+  )
+
+  invalid <- (
+    !is.na(original) &
+    nzchar(trimws(original)) &
+    is.na(converted)
+  )
+
+  if (any(invalid)) {
+    stop("Non-numeric values in ", field)
+  }
+
+  converted
+}
+
+thickness_cols <- grep(
+  "^[LR]_.*_thickavg$",
+  names(dat),
+  value = TRUE
+)
+
+surface_cols <- grep(
+  "^[LR]_.*_surfavg$",
+  names(dat),
+  value = TRUE
+)
+
+for (hemi in c("L", "R")) {
+  if (
+    sum(startsWith(thickness_cols, paste0(hemi, "_"))) != 34L ||
+    sum(startsWith(surface_cols, paste0(hemi, "_"))) != 34L
+  ) {
+    stop("Expected 34 cortical regions per hemisphere.")
+  }
+}
+
+numeric_cols <- unique(c(
+  primary_raw,
+  "age", "ICV",
+  "Euler_LH", "Euler_RH",
+  source_cols,
+  thickness_cols,
+  surface_cols
+))
+
+for (nm in numeric_cols) {
+  dat[[nm]] <- convert_numeric(
+    dat[[nm]],
+    nm
+  )
+}
+
+# ------------------------------------------------------------
+# 6. APPLY PRIVATE QUALITY-CONTROL DECISIONS
+# ------------------------------------------------------------
+
+# Private QC manifest structure:
+#
+# region_missing:
+#   data.frame(SubjID, variable)
+#
+# right_euler_exclusion_id:
+#   the participant key for the original sensitivity
+#   exclusion, stored only in the private manifest.
+#
+# The manifest must reproduce the original 2026 QC
+# decisions. It is not generated automatically.
+
+qc <- readRDS(qc_path)
+
+if (
+  !is.list(qc) ||
+  !all(c(
+    "region_missing",
+    "right_euler_exclusion_id"
+  ) %in% names(qc))
+) {
+  stop("Invalid private QC manifest.")
+}
+
+qc_regions <- qc$region_missing
+
+if (
+  !is.data.frame(qc_regions) ||
+  !all(c("SubjID", "variable") %in% names(qc_regions))
+) {
+  stop("Invalid regional QC entries.")
+}
+
+if (
+  anyNA(qc_regions$SubjID) ||
+  anyNA(qc_regions$variable) ||
+  !all(qc_regions$SubjID %in% dat$SubjID) ||
+  !all(qc_regions$variable %in%
+       c(thickness_cols, surface_cols))
+) {
+  stop("Regional QC entries do not match source data.")
+}
+
+# Apply region-specific missing-value corrections.
+
+for (i in seq_len(nrow(qc_regions))) {
+  participant <- qc_regions$SubjID[i]
+  variable <- qc_regions$variable[i]
+
+  dat[
+    dat$SubjID == participant,
+    variable
+  ] <- NA_real_
+}
+
+# Define the original right-hemisphere
+# sensitivity exclusion without embedding IDs.
+
+sensitivity_id <- qc$right_euler_exclusion_id
+
+if (
+  length(sensitivity_id) != 1L ||
+  is.na(sensitivity_id) ||
+  sum(dat$SubjID == sensitivity_id) != 1L
+) {
+  stop("Invalid sensitivity exclusion key.")
+}
+
+dat$exclude_right_euler_sensitivity <- (
+  dat$SubjID == sensitivity_id
+)
+
+stopifnot(
+  is.logical(dat$exclude_right_euler_sensitivity),
+  sum(dat$exclude_right_euler_sensitivity) == 1L
+)
+
+# ------------------------------------------------------------
+# 7. PRIMARY BILATERAL VOLUMES
+# ------------------------------------------------------------
+
+dat <- dat %>%
+  mutate(
+    Thalamus = Lthal + Rthal,
+    Caudate = Lcaud + Rcaud,
+    Putamen = Lput + Rput,
+    Pallidum = Lpal + Rpal,
+    Hippocampus = Lhippo + Rhippo,
+    Amygdala = Lamyg + Ramyg,
+    Accumbens = Laccumb + Raccumb,
+    LateralVentricles = LLatVent + RLatVent,
+    Brainstem = Whole_brainstem
+  )
+
+# ------------------------------------------------------------
+# 8. BILATERAL SUBREGIONAL VOLUMES
+# ------------------------------------------------------------
+
+# Uses only the explicitly approved dictionary.
+# No broad prefix selection is used to create ROIs.
+
+for (i in seq_len(nrow(dictionary))) {
+
+  output <- dictionary$output_name[i]
+  left <- dictionary$left_column[i]
+  right <- dictionary$right_column[i]
+
+  if (output %in% names(dat)) {
+    stop("Bilateral variable already exists: ", output)
+  }
+
+  dat[[output]] <- (
+    dat[[left]] + dat[[right]]
+  )
+}
+
+# Confirm all 52 expected bilateral measures.
+
+stopifnot(
+  sum(grepl("^Thal_", names(dat))) == 25L,
+  sum(grepl("^Hip_", names(dat))) == 18L,
+  sum(grepl("^Amyg_", names(dat))) == 9L
+)
+
+# ------------------------------------------------------------
+# 9. FINAL CORTICAL VARIABLES
+# ------------------------------------------------------------
+
+dat$Euler_Mean <- (
+  dat$Euler_LH + dat$Euler_RH
+) / 2
+
+# Cortical thickness and surface area remain
+# separate by hemisphere.
+
+# Thickness models use age, sex and hemisphere-
+# specific Euler number.
+#
+# Surface-area models additionally include ICV.
+
+# ------------------------------------------------------------
+# 10. SAVE RESTRICTED PREPARED DATASET
+# ------------------------------------------------------------
+
+output_file <- file.path(
+  output_dir,
+  "final_prepared_private.rds"
+)
+
+saveRDS(
+  dat,
+  output_file
+)
+
+message(
+  "Final analytical dataset prepared. ",
+  "Restricted output saved locally."
+)
+
+# ============================================================
+# END
+# ============================================================
