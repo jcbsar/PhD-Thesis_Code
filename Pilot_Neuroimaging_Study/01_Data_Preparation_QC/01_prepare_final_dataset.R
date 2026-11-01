@@ -10,8 +10,6 @@
 # Participant-level data, QC decisions and mappings
 # are restricted and are not included in GitHub.
 #
-# Reconstructed from the original 2026 workflow.
-# Numerical equivalence has not yet been verified.
 # ============================================================
 
 suppressPackageStartupMessages({
