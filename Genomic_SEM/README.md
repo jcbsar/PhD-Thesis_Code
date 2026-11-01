@@ -1,6 +1,6 @@
-# Chapter 3 - Genetic Overlap Between Epilepsy and Subcortical Brain Volumes
+# Genetic Overlap Between Epilepsy and Subcortical Brain Volumes
 
-This chapter investigates the genetic architecture of epilepsy phenotypes and subcortical brain volumes using linkage disequilibrium score regression (LDSC) and Genomic Structural Equation Modelling (Genomic SEM). The analyses aimed to characterise SNP-based heritability, examine genetic correlations between epilepsy subtypes and subcortical brain volumes, investigate underlying latent genetic structures, and identify genetic variants associated with the resulting latent factors.
+This study investigates the genetic architecture of epilepsy phenotypes and subcortical brain volumes using linkage disequilibrium score regression (LDSC) and Genomic Structural Equation Modelling (Genomic SEM). The analyses aimed to characterise SNP-based heritability, examine genetic correlations between epilepsy subtypes and subcortical brain volumes, investigate underlying latent genetic structures, and identify genetic variants associated with the resulting latent factors.
 
 ## Analytical Workflow
 
