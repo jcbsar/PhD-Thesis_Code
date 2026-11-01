@@ -1,0 +1,542 @@
+
+# ============================================================
+# PILOT NEUROIMAGING STUDY
+# Subregional Volumetric Analyses
+#
+# Final analysis: August 2026
+#
+# Analyses:
+#   1. Bilateral thalamic nuclei (25)
+#   2. Bilateral hippocampal subfields (18)
+#   3. Bilateral amygdala nuclei (9)
+#
+# Diagnostic comparisons:
+#   Four-group: Control, GGE, FE, FDS
+#   Three-group: Control, Epilepsy, FDS
+#
+# Models adjusted for age, sex and ICV.
+# BH-FDR applied separately within each anatomical
+# family and diagnostic contrast.
+#
+# Data are restricted and not publicly distributed.
+# ============================================================
+
+
+# ------------------------------------------------------------
+# 1. REQUIRED PACKAGES
+# ------------------------------------------------------------
+
+library(dplyr)
+library(emmeans)
+
+
+# ------------------------------------------------------------
+# 2. INPUT AND OUTPUT PATHS
+# ------------------------------------------------------------
+
+# Set these paths locally before running.
+# Do not commit participant-level input or output data.
+
+input_file <- "restricted_data/ABHGP_T1_clean_analysis_data_with_subregions.rds"
+
+output_dir <- "restricted_outputs/subregional"
+
+if (!file.exists(input_file)) {
+  stop("Restricted input dataset not found.")
+}
+
+dir.create(
+  output_dir,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dat <- readRDS(input_file)
+
+
+# ------------------------------------------------------------
+# 3. DIAGNOSTIC GROUP VARIABLES
+# ------------------------------------------------------------
+
+required_variables <- c(
+  "diagnosis",
+  "age",
+  "sex",
+  "ICV"
+)
+
+missing_variables <- setdiff(
+  required_variables,
+  names(dat)
+)
+
+if (length(missing_variables) > 0) {
+  stop(
+    "Missing variables: ",
+    paste(missing_variables, collapse = ", ")
+  )
+}
+
+dat <- dat %>%
+  mutate(
+    diagnosis4 = factor(
+      diagnosis,
+      levels = c("Control", "GGE", "FE", "FDS")
+    ),
+
+    diagnosis3 = case_when(
+      diagnosis == "Control" ~ "Control",
+      diagnosis %in% c("GGE", "FE") ~ "Epilepsy",
+      diagnosis == "FDS" ~ "FDS",
+      TRUE ~ NA_character_
+    ),
+
+    diagnosis3 = factor(
+      diagnosis3,
+      levels = c("Control", "Epilepsy", "FDS")
+    ),
+
+    age = as.numeric(age),
+    ICV = as.numeric(ICV),
+    sex = factor(sex)
+  )
+
+if (anyNA(dat$diagnosis4)) {
+  stop("Unrecognised or missing diagnostic categories.")
+}
+
+expected_counts <- c(
+  Control = 61,
+  GGE = 21,
+  FE = 49,
+  FDS = 19
+)
+
+observed_counts <- table(dat$diagnosis4)
+
+if (!identical(
+  as.integer(observed_counts),
+  as.integer(expected_counts)
+)) {
+  stop(
+    "Diagnostic group counts differ from the ",
+    "final 2026 analytical cohort."
+  )
+}
+
+
+# ------------------------------------------------------------
+# 4. IDENTIFY BILATERAL SUBREGIONAL MEASURES
+# ------------------------------------------------------------
+
+# The restricted input is expected to contain the
+# bilateral variables produced by the August 2026
+# preparation workflow:
+#
+# Thal_ : summed left and right thalamic nuclei
+# Hip_  : summed left and right hippocampal subfields
+# Amyg_ : summed left and right amygdala nuclei
+#
+# The actual source-to-bilateral mappings must be
+# verified in the restricted data preparation script.
+
+thal_rois <- grep(
+  "^Thal_",
+  names(dat),
+  value = TRUE
+)
+
+hippo_rois <- grep(
+  "^Hip_",
+  names(dat),
+  value = TRUE
+)
+
+amyg_rois <- grep(
+  "^Amyg_",
+  names(dat),
+  value = TRUE
+)
+
+expected_roi_counts <- c(
+  Thalamus = 25,
+  Hippocampus = 18,
+  Amygdala = 9
+)
+
+observed_roi_counts <- c(
+  Thalamus = length(thal_rois),
+  Hippocampus = length(hippo_rois),
+  Amygdala = length(amyg_rois)
+)
+
+if (!identical(
+  as.integer(observed_roi_counts),
+  as.integer(expected_roi_counts)
+)) {
+  stop(
+    "Unexpected subregional ROI counts. ",
+    "Check bilateral variable selection and ",
+    "the original FreeSurfer mappings."
+  )
+}
+
+all_rois <- c(
+  thal_rois,
+  hippo_rois,
+  amyg_rois
+)
+
+dat <- dat %>%
+  mutate(
+    across(
+      all_of(all_rois),
+      as.numeric
+    )
+  )
+
+if (any(vapply(
+  dat[all_rois],
+  function(x) all(is.na(x)),
+  logical(1)
+))) {
+  stop("At least one subregional ROI has no valid values.")
+}
+
+
+# ------------------------------------------------------------
+# 5. DEFINE DIAGNOSTIC CONTRASTS
+# ------------------------------------------------------------
+
+contrasts_4group <- list(
+  "GGE vs Control" = c(-1, 1, 0, 0),
+  "FE vs Control" = c(-1, 0, 1, 0),
+  "FDS vs Control" = c(-1, 0, 0, 1)
+)
+
+contrasts_3group <- list(
+  "Epilepsy vs Control" = c(-1, 1, 0),
+  "FDS vs Control" = c(-1, 0, 1),
+  "Epilepsy vs FDS" = c(0, 1, -1)
+)
+
+
+# ------------------------------------------------------------
+# 6. REGION-WISE LINEAR REGRESSION
+# ------------------------------------------------------------
+
+run_subregional_models <- function(
+  data,
+  rois,
+  grouping
+) {
+
+  if (grouping == "diagnosis4") {
+    contrast_definitions <- contrasts_4group
+  } else if (grouping == "diagnosis3") {
+    contrast_definitions <- contrasts_3group
+  } else {
+    stop("Invalid diagnostic grouping.")
+  }
+
+  results <- lapply(rois, function(roi) {
+
+    model_formula <- as.formula(
+      paste(
+        roi,
+        "~",
+        grouping,
+        "+ age + sex + ICV"
+      )
+    )
+
+    model <- lm(
+      model_formula,
+      data = data
+    )
+
+    emm <- emmeans(
+      model,
+      specs = grouping
+    )
+
+    comparisons <- contrast(
+      emm,
+      method = contrast_definitions
+    )
+
+    result <- as.data.frame(
+      summary(
+        comparisons,
+        infer = c(TRUE, TRUE),
+        adjust = "none"
+      )
+    )
+
+    result$ROI <- roi
+
+    result
+  })
+
+  results <- dplyr::bind_rows(results)
+
+  # BH-FDR within the anatomical family
+  # separately for each diagnostic contrast.
+  results <- results %>%
+    group_by(contrast) %>%
+    mutate(
+      q_BH = p.adjust(
+        p.value,
+        method = "BH"
+      )
+    ) %>%
+    ungroup() %>%
+    select(
+      ROI,
+      contrast,
+      estimate,
+      SE,
+      df,
+      lower.CL,
+      upper.CL,
+      t.ratio,
+      p.value,
+      q_BH
+    ) %>%
+    arrange(contrast, p.value)
+
+  results
+}
+
+
+# ------------------------------------------------------------
+# 7. THALAMIC NUCLEI
+# Appendix Table A2
+# ------------------------------------------------------------
+
+thal_results_4group_clean <- run_subregional_models(
+  dat,
+  thal_rois,
+  "diagnosis4"
+)
+
+thal_results_3group_clean <- run_subregional_models(
+  dat,
+  thal_rois,
+  "diagnosis3"
+)
+
+
+# ------------------------------------------------------------
+# 8. HIPPOCAMPAL SUBFIELDS
+# Appendix Table A4
+# ------------------------------------------------------------
+
+hippo_results_4group_clean <- run_subregional_models(
+  dat,
+  hippo_rois,
+  "diagnosis4"
+)
+
+hippo_results_3group_clean <- run_subregional_models(
+  dat,
+  hippo_rois,
+  "diagnosis3"
+)
+
+
+# ------------------------------------------------------------
+# 9. AMYGDALA NUCLEI
+# Appendix Table A5
+# ------------------------------------------------------------
+
+amyg_results_4group_clean <- run_subregional_models(
+  dat,
+  amyg_rois,
+  "diagnosis4"
+)
+
+amyg_results_3group_clean <- run_subregional_models(
+  dat,
+  amyg_rois,
+  "diagnosis3"
+)
+
+
+# ------------------------------------------------------------
+# 10. CHECK RESULT DIMENSIONS
+# ------------------------------------------------------------
+
+expected_rows <- c(
+  thal_4group = 25 * 3,
+  thal_3group = 25 * 3,
+  hippo_4group = 18 * 3,
+  hippo_3group = 18 * 3,
+  amyg_4group = 9 * 3,
+  amyg_3group = 9 * 3
+)
+
+observed_rows <- c(
+  thal_4group = nrow(thal_results_4group_clean),
+  thal_3group = nrow(thal_results_3group_clean),
+  hippo_4group = nrow(hippo_results_4group_clean),
+  hippo_3group = nrow(hippo_results_3group_clean),
+  amyg_4group = nrow(amyg_results_4group_clean),
+  amyg_3group = nrow(amyg_results_3group_clean)
+)
+
+stopifnot(
+  identical(
+    as.integer(observed_rows),
+    as.integer(expected_rows)
+  )
+)
+
+
+# ------------------------------------------------------------
+# 11. SUMMARISE FDR-SIGNIFICANT RESULTS
+# ------------------------------------------------------------
+
+summarise_significant <- function(results) {
+  results %>%
+    group_by(contrast) %>%
+    summarise(
+      n_significant = sum(
+        q_BH < 0.05,
+        na.rm = TRUE
+      ),
+      .groups = "drop"
+    )
+}
+
+thal_significant_4group <- summarise_significant(
+  thal_results_4group_clean
+)
+
+thal_significant_3group <- summarise_significant(
+  thal_results_3group_clean
+)
+
+hippo_significant_4group <- summarise_significant(
+  hippo_results_4group_clean
+)
+
+hippo_significant_3group <- summarise_significant(
+  hippo_results_3group_clean
+)
+
+amyg_significant_4group <- summarise_significant(
+  amyg_results_4group_clean
+)
+
+amyg_significant_3group <- summarise_significant(
+  amyg_results_3group_clean
+)
+
+
+# ------------------------------------------------------------
+# 12. SAVE AGGREGATE STATISTICAL OUTPUTS
+# ------------------------------------------------------------
+
+# Outputs remain local until disclosure approval.
+# Do not commit restricted_outputs to GitHub.
+
+write.csv(
+  thal_results_4group_clean,
+  file.path(
+    output_dir,
+    "thalamic_nuclei_four_group_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  thal_results_3group_clean,
+  file.path(
+    output_dir,
+    "thalamic_nuclei_collapsed_group_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  hippo_results_4group_clean,
+  file.path(
+    output_dir,
+    "hippocampal_subfields_four_group_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  hippo_results_3group_clean,
+  file.path(
+    output_dir,
+    "hippocampal_subfields_collapsed_group_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  amyg_results_4group_clean,
+  file.path(
+    output_dir,
+    "amygdala_nuclei_four_group_results.csv"
+  ),
+  row.names = FALSE
+)
+
+write.csv(
+  amyg_results_3group_clean,
+  file.path(
+    output_dir,
+    "amygdala_nuclei_collapsed_group_results.csv"
+  ),
+  row.names = FALSE
+)
+
+
+# ------------------------------------------------------------
+# 13. FINAL VERIFICATION SUMMARY
+# ------------------------------------------------------------
+
+cat("\nTHALAMIC NUCLEI — FOUR GROUPS\n")
+print(thal_significant_4group)
+
+cat("\nTHALAMIC NUCLEI — COLLAPSED\n")
+print(thal_significant_3group)
+
+cat("\nHIPPOCAMPAL SUBFIELDS — FOUR GROUPS\n")
+print(hippo_significant_4group)
+
+cat("\nHIPPOCAMPAL SUBFIELDS — COLLAPSED\n")
+print(hippo_significant_3group)
+
+cat("\nAMYGDALA NUCLEI — FOUR GROUPS\n")
+print(amyg_significant_4group)
+
+cat("\nAMYGDALA NUCLEI — COLLAPSED\n")
+print(amyg_significant_3group)
+
+
+# Expected findings from the final thesis:
+#
+# Thalamic nuclei:
+#   GGE vs Control        : 16 significant
+#   FE vs Control         : 1 significant
+#   FDS vs Control        : 0 significant
+#   Epilepsy vs Control   : 11 significant
+#   Epilepsy vs FDS       : 0 significant
+#
+# Hippocampal subfields:
+#   No FDR-significant comparisons
+#
+# Amygdala nuclei:
+#   No FDR-significant comparisons
+#
+# These are verification targets, not results
+# independently reproduced by this script here.
+#
+# ============================================================
+# END
+# ============================================================
