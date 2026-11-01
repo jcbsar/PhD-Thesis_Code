@@ -430,8 +430,91 @@ dat <- dat %>%
 # 8. BILATERAL SUBREGIONAL VOLUMES
 # ------------------------------------------------------------
 
-# Uses only the explicitly approved dictionary.
-# No broad prefix selection is used to create ROIs.
+
+# ------------------------------------------------------------
+# 8A. VERIFY ANATOMICAL MAPPINGS
+# ------------------------------------------------------------
+
+# Verify that left and right source columns refer to
+# the same anatomical structure and that output names
+# reproduce the August 2026 naming convention.
+
+source_suffix <- function(x, family, side) {
+
+  prefix <- if (family == "Thalamus") {
+    if (side == "left") "Left-" else "Right-"
+  } else {
+    if (side == "left") "L_" else "R_"
+  }
+
+  if (!startsWith(x, prefix)) {
+    stop("Unexpected source prefix: ", x)
+  }
+
+  substring(x, nchar(prefix) + 1L)
+}
+
+expected_outputs <- character(nrow(dictionary))
+
+for (i in seq_len(nrow(dictionary))) {
+
+  family <- dictionary$family[i]
+
+  left_name <- source_suffix(
+    dictionary$left_column[i],
+    family,
+    "left"
+  )
+
+  right_name <- source_suffix(
+    dictionary$right_column[i],
+    family,
+    "right"
+  )
+
+  if (!identical(left_name, right_name)) {
+    stop(
+      "Left/right anatomical mismatch at row ", i,
+      ": ", left_name, " vs ", right_name
+    )
+  }
+
+  expected_outputs[i] <- paste0(
+    prefixes[[family]],
+    gsub("[^A-Za-z0-9]", "_", left_name)
+  )
+}
+
+if (!identical(
+  dictionary$output_name,
+  expected_outputs
+)) {
+  stop(
+    "Dictionary output names differ from the ",
+    "original August 2026 naming convention."
+  )
+}
+
+if (
+  anyDuplicated(dictionary$left_column) ||
+  anyDuplicated(dictionary$right_column) ||
+  anyDuplicated(expected_outputs)
+) {
+  stop(
+    "Duplicate source measurements or bilateral ",
+    "output names detected."
+  )
+}
+
+message(
+  "Subregional dictionary structural checks passed: ",
+  "25 thalamic, 18 hippocampal and 9 amygdala regions."
+)
+
+# These checks validate naming, pairing and counts.
+# They do not independently establish that the
+# anatomical selections match the final thesis.
+
 
 for (i in seq_len(nrow(dictionary))) {
 
