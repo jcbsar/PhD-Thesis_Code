@@ -2,11 +2,6 @@
 # ============================================================
 # PILOT NEUROIMAGING STUDY
 # 03 - CORTICAL MORPHOLOGY ANALYSES
-#
-# Final analysis: August 2026
-# Thesis: Chapter 6
-# Appendix Tables: A3, A6, A7 and A8
-#
 # Targeted cortical thickness: 12 ROIs/hemisphere
 # Whole-cortex thickness: 34 ROIs/hemisphere
 # Cortical surface area: 34 ROIs/hemisphere
