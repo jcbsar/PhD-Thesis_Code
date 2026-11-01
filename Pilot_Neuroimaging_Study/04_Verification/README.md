@@ -1,3 +1,26 @@
-# Verification plan (not yet executed)
 
-Compare generated aggregate statistical results with final thesis Appendix A1–A8, including estimate, SE, confidence intervals, raw p-values and BH-FDR q-values. Verify cohort counts (61/21/49/19), 9 primary ROIs, 25 thalamic nuclei, 18 hippocampal subfields, 9 amygdala nuclei, 12 targeted cortical ROIs per hemisphere, 34 whole-cortex ROIs per hemisphere and sensitivity-test families. Do not publish participant-level outputs or individual QC case details. Verification requires authorised restricted inputs; the supplied source files alone do not establish numerical reproduction.
+# Verification of Neuroimaging Results
+
+This directory contains the verification script for the final 2026 pilot neuroimaging analyses.
+
+## Verification script
+
+`01_verify_imaging_results.R`
+
+The script compares aggregate statistical outputs with selected findings reported in Appendix Tables A1-A8.
+
+Verification includes:
+
+- Expected numbers of regions and diagnostic comparisons.
+- Selected effect estimates and BH-FDR-adjusted p-values.
+- Numbers of FDR-significant thalamic nuclei.
+- Absence of FDR-significant hippocampal and amygdala subregional findings.
+- Selected cortical thickness, surface-area and sensitivity findings.
+
+## Verification status
+
+**Implemented but not yet executed against the final restricted dataset.**
+
+The current checks assess selected reported findings and output structure. They do not establish complete numerical equivalence across every appendix comparison.
+
+Verification requires authorised access to the final analytical dataset and associated private QC documentation. Participant-level data and identifying QC information are not publicly available.
